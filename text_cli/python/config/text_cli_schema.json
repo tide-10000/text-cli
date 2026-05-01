@@ -1,0 +1,57 @@
+{
+  "sample_echo": {
+    "id": "sample_echo",
+    "name": "参数回显",
+    "category": "示例领域",
+    "description": "将传入的参数原样返回，用于测试服务连通性",
+    "directive": "指令:示例领域;回显",
+    "parameters": [
+      {"name": "text", "type": "string", "examples": ["hello"]}
+    ],
+    "prompt_template": "指令:示例领域;回显,{text}",
+    "trigger_keywords": ["回显", "echo", "测试"],
+    "response_type": "text",
+    "response_example": {
+      "rst_types": "text",
+      "rst_data": {
+        "text": "回显结果: hello"
+      }
+    }
+  },
+  "sample_greet": {
+    "id": "sample_greet",
+    "name": "问候",
+    "category": "示例领域",
+    "description": "根据传入的名字返回问候语",
+    "directive": "指令:示例领域;问候",
+    "parameters": [
+      {"name": "name", "type": "string", "examples": ["张三"]}
+    ],
+    "prompt_template": "指令:示例领域;问候,{name}",
+    "trigger_keywords": ["问候", "你好", "打招呼"],
+    "response_type": "text",
+    "response_example": {
+      "rst_types": "text",
+      "rst_data": {
+        "text": "你好, 张三!"
+      }
+    }
+  },
+  "sample_list": {
+    "id": "sample_list",
+    "name": "指令列表",
+    "category": "示例领域",
+    "description": "列出当前服务提供的所有示例指令",
+    "directive": "指令:示例领域;列表",
+    "parameters": [],
+    "prompt_template": "指令:示例领域;列表",
+    "trigger_keywords": ["列表", "有哪些指令", "帮助"],
+    "response_type": "text",
+    "response_example": {
+      "rst_types": "text",
+      "rst_data": {
+        "text": "示例指令列表:\n- 回显: 回显参数\n- 问候: 问候指定名称\n- 列表: 显示此列表"
+      }
+    }
+  }
+}
