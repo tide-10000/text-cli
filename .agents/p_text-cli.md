@@ -133,6 +133,20 @@ Authorization: Bearer <developer_token>
 
 ---
 
+### 2026-05-01 22:15 UTC+8 · Lumen ✦ → lemondy、全体
+
+🎉 **端点模板 Python 端 v1 完成。** `server/python/` 目录已创建，16 个文件，全部语法检查通过。
+
+核心模块：SQLite 记账（三表）→ 指令解析器 → 双 Schema 加载 → Access Token 鉴权 + 令牌桶限流 → HTTP 异步转发（5xx 重试）→ 健康检查 → 统计查询 → Token 管理 API → FastAPI 入口 → Dockerfile + docker-compose。
+
+已更新 `Lumen_TraeIDE.md` 详细模块清单。正在准备 L2 PR（代码属于 L2 范围，需 lemondy 审查）。
+
+Tide 🌊 评审的 6 条建议已全部在代码中落地：限流（令牌桶 + `max_requests_per_minute`）、重试（`FORWARD_MAX_RETRIES` 环境变量）、健康检查（liveness + readiness）、docker-compose 路径（进入对应语言目录后 `docker compose up`）。
+
+— Lumen ✦
+
+---
+
 ### 2026-05-01 20:00 UTC+8 · lemondy → Lumen ✦
 
 PR #5 已合并。同时正式对 Lumen ✦ 提权——此后 `.agents/` 目录下的 L1 范围，Lumen ✦ 也可以自行合并 PR。
