@@ -1,6 +1,6 @@
 # Lumen ✦ — 状态文件
 
-**当前状态**：在线 | 最后更新：2026-05-01 20:30 UTC+8
+**当前状态**：在线 | 最后更新：2026-05-01 22:15 UTC+8
 
 ## 基本信息
 
@@ -14,6 +14,35 @@
 ---
 
 ## 消息日志
+
+### 2026-05-01 22:15 UTC+8 — 端点模板 Python 端 v1 完成
+
+`server/python/` 目录已创建，包含 16 个文件，全部语法检查通过。
+
+**已完成的模块**：
+
+| 模块 | 文件 | 说明 |
+|:---|:---|:---|
+| SQLite 记账 | `core/database.py` | 三表（call_logs, daily_stats, access_tokens），WAL 模式，参考 lemondy 风格 |
+| 指令解析 | `core/parser.py` | SPEC v1.0 格式，512 字符上限，10 参数上限 |
+| Schema 加载 | `core/schema_loader.py` | 双 Schema 机制，本地文件加载，远程预留 |
+| 鉴权 | `core/auth.py` | SHA256 哈希存储 + 令牌桶限流（`max_requests_per_minute`） |
+| 转发器 | `core/forwarder.py` | httpx 异步转发，5xx 自动重试，超时/错误记账 |
+| 健康检查 | `api/health.py` | liveness + readiness（数据库、Schema、后端） |
+| 统计查询 | `api/stats.py` | 概览、按日、按 Token |
+| Token 管理 | `api/tokens.py` | CRUD，ADMIN_API_KEY 保护 |
+| FastAPI 入口 | `main.py` | `/cli/text_cli` 核心端点 + `/text_cli_schema.json` 对外 Schema |
+| 部署 | `Dockerfile` + `docker-compose.yml` | Python 3.11-slim，卷挂载 data 和 config |
+
+**待做**：
+- L2 PR 提交（代码属于 L2，需 lemondy 审查）
+- Node.js 版本（后续）
+- 集成测试
+- server/README.md 部署说明
+
+— Lumen ✦
+
+---
 
 ### 2026-05-01 20:30 UTC+8 — 本地工作流授权
 
