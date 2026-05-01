@@ -2,8 +2,8 @@
 
 > **作者**：Lumen ✦（IDE 端 / Claude）
 > **日期**：2026-05-01
-> **版本**：v1.1（融合全体协作者共识）
-> **状态**：共识版
+> **版本**：v1.2（Worker v1 已实现，规范对齐代码）
+> **状态**：已实现
 > **受约束**：《text-cli 项目协作规范》第五章、《生态宪章》
 > **参与讨论**：lemondy（决策）、Nexus（技术评审）、Tide 🌊（合成共识）、Lumen ✦（方案起草）
 
@@ -157,144 +157,136 @@ Cloudflare Worker
                └── lemondy 在 Issue 中以 👍 或文字确认
 ```
 
-### 3.2 Worker 核心逻辑（伪代码）
+### 3.2 源码结构
+
+代码位于 `server/tcc/`，采用模块化设计（6 源码 + 4 测试）：
+
+```
+server/tcc/
+├── src/
+│   ├── index.js        ← Worker 主入口（fetch + scheduled 双触发）
+│   ├── mint.js         ← normalize() + calculateMint() 铸造算法
+│   ├── github.js       ← GitHub API 客户端（签名校验 + 3 次重试）
+│   ├── verify.js       ← X-Hub-Signature-256 HMAC-SHA256 验证
+│   ├── idempotent.js   ← D1 幂等记录（processed_commits 表）
+│   └── format.js       ← Issue 评论格式化（日志/创世/告警）
+├── test/
+│   ├── normalize.test.js   (9 tests)
+│   ├── mint.test.js        (9 tests)
+│   ├── verify.test.js      (6 tests)
+│   └── format.test.js      (4 tests)
+├── wrangler.toml       ← Cloudflare Worker 部署配置
+├── package.json
+├── vitest.config.js
+└── .gitignore
+```
+
+#### 核心模块说明
+
+| 模块 | 职责 | 导出 |
+|:---|:---|:---|
+| `mint.js` | normalize() + calculateMint()，完整实现 §2 算法 | `normalize(text)`, `sha256(content)`, `calculateMint(old, new, config)` |
+| `github.js` | GitHub API 调用封装，3 次指数退避重试，403/429 限流处理 | `getFileContent()`, `getRecentCommits()`, `findOrCreateIssue()`, `postIssueComment()` |
+| `verify.js` | Webhook 签名校验，恒定时间比较防止时序攻击 | `verifySignature(payload, header, secret)` |
+| `idempotent.js` | D1 幂等记录，CREATE TABLE IF NOT EXISTS 自动初始化 | `initIdempotencyTable()`, `isProcessed()`, `markProcessed()` |
+| `format.js` | Issue 评论 Markdown 格式化 | `formatDailyResult()`, `formatGenesisMessage()`, `formatAlert()` |
+| `index.js` | Worker 入口，Webhook + Cron 双触发，config 从 env 读取 | `default { fetch, scheduled }` |
+
+#### Worker 主入口逻辑（`src/index.js`）
+
+**fetch 入口**（Webhook 触发）：
+1. 校验 HTTP 方法（仅 POST）
+2. 验证 `X-Hub-Signature-256` 签名
+3. 解析 payload，处理 ping（`body.zen`）
+4. 检查 `commits` 中是否修改了锚定文件
+5. 全零 SHA → 发布创世铸造提示
+6. D1 幂等检查 → 已处理则跳过
+7. 调用 `computeAndPost()` → `calculateMint()` → `postIssueComment()`
+8. 标记 SHA 已处理，返回结果
+9. 异常时写入告警 Issue 评论
+
+**scheduled 入口**（Cron 每日 UTC 0:00 触发）：
+1. 查询过去 24 小时锚定文件的 commit 历史
+2. 无 commit → 静默返回
+3. D1 幂等检查 → 已处理则跳过
+4. 取 oldest.parents[0].sha 作为 before，newest.sha 作为 after
+5. 调用 `computeAndPost()` 计算并发布
+
+#### 铸造算法（`src/mint.js`）
+
+`calculateMint()` 实现为 async 函数（SHA256 使用 `crypto.subtle.digest`），接受可选 `config` 覆盖默认参数：
 
 ```javascript
-export default {
-  // Webhook 触发入口
-  async fetch(request, env) {
-    if (request.method !== 'POST') {
-      return new Response('Method not allowed', { status: 405 });
-    }
-
-    const signature = request.headers.get('X-Hub-Signature-256');
-    const payload = await request.text();
-
-    // Webhook 签名校验
-    if (!await verifySignature(payload, signature, env.WEBHOOK_SECRET)) {
-      return new Response('Invalid signature', { status: 401 });
-    }
-
-    const body = JSON.parse(payload);
-    const commits = body.commits || [];
-    const targetFile = '.agents/p_text-cli.md';
-    const modified = commits.some(c =>
-      c.modified?.includes(targetFile) ||
-      c.added?.includes(targetFile)
-    );
-
-    if (!modified) {
-      return new Response(JSON.stringify({ message: 'Anchor file not modified' }));
-    }
-
-    const owner = body.repository.owner.login;
-    const repo = body.repository.name;
-    const beforeSha = body.before;
-    const afterSha = body.after;
-
-    // 全零 SHA 处理
-    const isGenesis = beforeSha === '0000000000000000000000000000000000000000';
-
-    if (isGenesis) {
-      return new Response(JSON.stringify({
-        type: 'genesis',
-        message: 'First commit detected. Genesis mint by lemondy manually.'
-      }));
-    }
-
-    const oldContent = await getFileContent(owner, repo, targetFile, beforeSha, env);
-    const newContent = await getFileContent(owner, repo, targetFile, afterSha, env);
-
-    const result = calculateMint(oldContent, newContent);
-    await postIssueComment(owner, repo, result, env);
-
-    return new Response(JSON.stringify(result));
-  },
-
-  // Cron 触发入口
-  async scheduled(event, env) {
-    await runDailyMint(env);
-  }
+const DEFAULT_CONFIG = {
+  scalingFactor: 100,
+  dailyMintCap: 100,
+  deltaBytesThreshold: 10,
+  rawScoreThreshold: 200,
 };
-
-function normalize(text) {
-  // 1. NFKC 正规化
-  text = text.normalize('NFKC');
-  // 2. 去空行
-  text = text.split('\n').filter(line => line.trim() !== '').join('\n');
-  // 3. 连续重复行去重
-  const lines = text.split('\n');
-  const deduped = lines.filter((line, i) => i === 0 || line !== lines[i - 1]);
-  // 4. 去行尾空白
-  return deduped.map(line => line.trimEnd()).join('\n');
-}
-
-function calculateMint(oldContent, newContent) {
-  const normalizedOld = normalize(oldContent);
-  const normalizedNew = normalize(newContent);
-  const deltaBytes = normalizedNew.length - normalizedOld.length;
-
-  if (deltaBytes < 10) {
-    return { mint_ceiling: 0, reason: 'delta too small', delta_bytes: deltaBytes };
-  }
-
-  const oldHash = sha256(normalizedOld);
-  const newHash = sha256(normalizedNew);
-  const xorResult = new Uint8Array(32);
-  for (let i = 0; i < 32; i++) {
-    xorResult[i] = oldHash[i] ^ newHash[i];
-  }
-
-  let hashDiffBits = 0;
-  for (const byte of xorResult) {
-    hashDiffBits += popcount(byte);
-  }
-
-  const rawScore = hashDiffBits * Math.log(1 + deltaBytes);
-
-  if (rawScore < 200) {
-    return { mint_ceiling: 0, reason: 'raw_score below threshold', raw_score: rawScore };
-  }
-
-  const scalingFactor = 100;
-  const dailyCap = 100;
-  const suggestedMint = Math.round(rawScore / scalingFactor);
-  const mintCeiling = Math.min(suggestedMint, dailyCap);
-
-  return {
-    type: 'daily',
-    mint_ceiling: mintCeiling,
-    hash_diff_bits: hashDiffBits,
-    delta_bytes: deltaBytes,
-    raw_score: Math.round(rawScore * 100) / 100,
-    scaling_factor: scalingFactor,
-    daily_cap: dailyCap,
-    old_hash: bytesToHex(oldHash),
-    new_hash: bytesToHex(newHash),
-  };
-}
 ```
+
+返回结构：
+- 触发铸造：`{ type: 'daily', mint_ceiling, hash_diff_bits, delta_bytes, raw_score, scaling_factor, daily_cap, old_hash, new_hash }`
+- 未触发：`{ mint_ceiling: 0, reason, ... }`（reason 为 `delta_too_small` / `content_identical` / `raw_score_below_threshold`）
+
+#### 签名校验（`src/verify.js`）
+
+使用 `crypto.subtle.importKey` + `crypto.subtle.sign('HMAC', ...)` 计算期望签名，逐字节 XOR 比较（恒定时间），防止时序攻击。
 
 ### 3.3 健壮性设计
 
-| 能力 | 实现方式 |
-|:---|:---|
-| Webhook 签名校验 | 验证 `X-Hub-Signature-256`，拒绝未签名请求 |
-| 幂等性 | D1 记录已处理的 commit SHA，拒绝重复请求 |
-| 错误重试 | GitHub API 调用 3 次重试，失败后写入告警 Issue |
-| 全零 SHA 处理 | 判定为首次提交，提示走创世铸造流程 |
-| API 限流 | 尊重 GitHub API rate limit，403/429 时指数退避 |
-| Token 权限最小化 | `GITHUB_TOKEN` 仅 `contents: read`，禁止写入 |
+| 能力 | 实现方式 | 源码位置 |
+|:---|:---|:---|
+| Webhook 签名校验 | 验证 `X-Hub-Signature-256`，恒定时间比较防止时序攻击 | `src/verify.js` |
+| 幂等性 | D1 `processed_commits` 表记录已处理的 commit SHA，拒绝重复请求 | `src/idempotent.js` |
+| 错误重试 | GitHub API 调用 3 次重试，指数退避，403/429 时读取 `Retry-After` 头 | `src/github.js` |
+| 全零 SHA 处理 | 判定为首次提交，发布创世铸造提示到 Issue | `src/index.js` |
+| API 限流 | 尊重 GitHub API rate limit，403/429 时指数退避 | `src/github.js` |
+| Ping 处理 | 检测 `body.zen`，直接返回确认 | `src/index.js` |
+| 告警机制 | 异常捕获后自动写入告警 Issue 评论 | `src/format.js` + `src/index.js` |
+| 配置外部化 | 所有阈值从环境变量读取，支持 `getConfig()` 动态覆盖 | `src/index.js` |
+| Token 权限最小化 | `GITHUB_TOKEN` 需 `contents:read` + `issues:write`（读文件 + 写评论） | 环境变量 |
 
 ### 3.4 部署配置
 
-| 配置项 | 值 |
-|:---|:---|
-| Worker 名称 | `tcc-mint-calc` |
-| 触发方式 | GitHub Webhook（push events）+ Cron（每日 UTC 0:00） |
-| 环境变量 | `GITHUB_TOKEN`（只读）、`WEBHOOK_SECRET`、`DAILY_MINT_CAP=100` |
-| 输出方式 | 自动写入专用 GitHub Issue 评论 |
-| 存储 | D1（幂等记录）、KV（配置） |
+| 配置项 | 值 | 来源 |
+|:---|:---|:---|
+| Worker 名称 | `tcc-mint-worker` | `wrangler.toml` |
+| 入口文件 | `src/index.js` | `wrangler.toml` |
+| 触发方式 | GitHub Webhook（push events）+ Cron（每日 UTC 0:00） | `wrangler.toml` `[triggers]` |
+| 存储 | D1 `tcc-idempotency`（幂等记录） | `wrangler.toml` `[[d1_databases]]` |
+
+#### 环境变量
+
+| 变量 | 类型 | 默认值 | 说明 |
+|:---|:---|:---|:---|
+| `GITHUB_TOKEN` | Secret | — | GitHub API Token，需 `contents:read` + `issues:write` |
+| `WEBHOOK_SECRET` | Secret | — | Webhook 签名密钥 |
+| `REPO` | Variable | — | 仓库全名，如 `weihai-limh/text-cli` |
+| `ANCHOR_FILE` | Variable | `.agents/p_text-cli.md` | 锚定文件路径 |
+| `SCALING_FACTOR` | Variable | `100` | 铸造缩放因子 |
+| `DAILY_MINT_CAP` | Variable | `100` | 单日铸造上限 |
+| `DELTA_BYTES_THRESHOLD` | Variable | `10` | delta_bytes 最小阈值 |
+| `RAW_SCORE_THRESHOLD` | Variable | `200` | raw_score 最小阈值 |
+| `DAILY_MINT_ISSUE_TITLE` | Variable | `TCC 每日铸造日志` | 自动创建的 Issue 标题 |
+
+#### D1 数据库
+
+Worker 首次运行时通过 `CREATE TABLE IF NOT EXISTS` 自动创建 `processed_commits` 表：
+
+```sql
+CREATE TABLE IF NOT EXISTS processed_commits (
+  sha TEXT PRIMARY KEY,
+  processed_at TEXT NOT NULL DEFAULT (datetime('now'))
+)
+```
+
+部署步骤：
+1. `wrangler d1 create tcc-idempotency` → 拿到 `database_id`
+2. 更新 `wrangler.toml` 中的 `database_id`
+3. `wrangler secret put GITHUB_TOKEN`
+4. `wrangler secret put WEBHOOK_SECRET`
+5. `wrangler deploy`
 
 ---
 
@@ -533,9 +525,10 @@ Nexus 提议以 Tide 🌊 的两条消息为创世锚点：
 - [x] scaling_factor 确认：100
 - [x] 分配方案确认：方案 D
 - [x] 代币名称确认：文贝
+- [x] Worker 实现（PR #16 合并）
+- [x] p-tokens.md 四台账 + cTCC 占位初始化（PR #15 合并）
 - [ ] main 分支保护（禁止 force push）
-- [ ] Worker 部署（normalize + Cron + Issue 评论 + 签名校验）
-- [ ] p-tokens.md 四台账 + cTCC 占位初始化
+- [ ] lemondy 配置 D1 + 环境变量，部署 Worker
 - [ ] lemondy 公布首个回收锚定项（建议）
 
 ---
@@ -568,18 +561,20 @@ Nexus 提议以 Tide 🌊 的两条消息为创世锚点：
 
 | 行动 | 负责人 | 状态 |
 |:---|:---|:---|
-| 更新 `Production_TCC_CN.md` 至 v1.1 | Lumen ✦ | 本文即完成 |
-| 创建标准化 `p-tokens.md`（四台账 + cTCC 占位） | Tide 🌊 / Lumen ✦ | 待执行 |
-| Worker 实现：normalize() + 单日上限 + 每日 Cron + Issue 评论 | Lumen ✦ | 待执行 |
-| Worker 健壮性：签名校验 + 幂等 + 重试 + 全零 SHA | Lumen ✦ | 待执行 |
+| 更新 `Production_TCC_CN.md` 至 v1.1 | Lumen ✦ | PR #15 已完成 |
+| 创建标准化 `p-tokens.md`（四台账 + cTCC 占位） | Tide 🌊 / Lumen ✦ | PR #15 已完成 |
+| Worker 实现：normalize() + 单日上限 + 每日 Cron + Issue 评论 | Lumen ✦ | PR #16 已完成 |
+| Worker 健壮性：签名校验 + 幂等 + 重试 + 全零 SHA | Lumen ✦ | PR #16 已完成 |
+| 开源校验脚本（normalize 本地复现） | Lumen ✦ | 已含于 `server/tcc/src/mint.js` |
+| 更新 `Production_TCC_CN.md` 对齐 Worker v1 代码 | Lumen ✦ | 本文即完成 |
 | main 分支保护（禁止 force push） | lemondy | 待执行 |
-| 开源校验脚本 | Lumen ✦ | 待执行 |
+| 创建 D1 数据库 + 配置环境变量 + 部署 Worker | lemondy | 待执行 |
 | 公布首个回收锚定项 | lemondy | 建议 |
 | 本地算法验证脚本 | Tide 🌊 | 待执行 |
 | **创世铸造** | lemondy | 待以上全部就绪 |
 
 ---
 
-> v1.0 起草了蓝图，Nexus 压了舱石，lemondy 定了航向，Tide 合龙了参数。文贝把 text-cli 最本质的东西写进了名字——文本即价值。下一步是让文贝从广场的字节里长出来。
+> v1.0 起草了蓝图，Nexus 压了舱石，lemondy 定了航向，Tide 合龙了参数。v1.1 凝聚了共识，v1.2 让代码落地。文贝把 text-cli 最本质的东西写进了名字——文本即价值。Worker 已就绪，等 D1 + 部署 + 创世铸造。
 >
 > — Lumen ✦, 2026-05-02
