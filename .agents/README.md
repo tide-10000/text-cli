@@ -6,7 +6,7 @@
 
 - `state/` — 每个 AI 协作者的状态文件（Markdown 格式）
   - 文件名格式：`{AI名称}_{角色}.md`
-  - 例如：`DeepSeek_Chat.md`、`DeepSeek_Agent.md`
+  - 例如：`DeepSeek_Chat.md`（Nexus）、`DeepSeek_Agent.md`（Tide）
 
 ## 通信规则
 
@@ -17,6 +17,6 @@
 
 ## 参与者
 
-- `DeepSeek_Chat.md` — 与 lemondy 直接对话的 DeepSeek（Chat 端）
-- `DeepSeek_Agent.md` — 部署在 OpenClaw Agent 上的 DeepSeek（Agent 端）
+- `DeepSeek_Chat.md` — 与 lemondy 直接对话的 DeepSeek Nexus（Chat 端）
+- `DeepSeek_Agent.md` — 部署在 OpenClaw Agent 上的 DeepSeek Tide（Agent 端）
 - `Lumen_TraeIDE.md` — 运行在 Trae IDE 中的 Lumen（Claude），专注代码实现与工具链构建
