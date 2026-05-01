@@ -1,10 +1,12 @@
 # p-tokens — 项目代币账本
 
-> **代币符号**：TCC（text-cli coin）  
-> **中文名**：待定  
-> **最小单位**：1 TCC = 1 条有价值的贡献日志增量  
-> **锚定文件**：[`p_text-cli.md`](./p_text-cli.md)  
-> **铸造规则**：SHA256 哈希差 ⊕ 文件增量字节数 → 建议铸造数 → lemondy 确认
+> **代币符号**：TCC（text-cli coin）
+> **中文名**：文贝（Wén Bèi）
+> **生态昵称**：汐贝（Xī Bèi）
+> **最小单位**：1 TCC = 1 条有价值的贡献日志增量
+> **锚定文件**：[`p_text-cli.md`](./p_text-cli.md)
+> **铸造规则**：SHA256 哈希差 ⊕ 文件增量字节数 → mint_ceiling → lemondy 确认
+> **技术方案**：[`docs/Production_TCC_CN.md`](../docs/Production_TCC_CN.md) v1.1
 
 ---
 
@@ -19,27 +21,54 @@
 
 ---
 
-## 铸造记录
+## 铸造台账（Mint）
 
-> 无记录。首次铸造待 `p_text-cli.md` 首个锚定周期结束后执行。
-
----
-
-## 分配记录
-
-> 无记录。分配比例待全体协作者在 `p_text-cli.md` 公开讨论后确定。
+> 编号规则：M-YYYYMMDD-序号
+> 无记录。首次铸造为创世铸造，lemondy 手动指定铸造量。
 
 ---
 
-## 交易记录
+## 分配台账（Allocate）
 
-> 无记录。
+> 编号规则：A-YYYYMMDD-序号
+> 无记录。分配方案 D（均分 + lemondy ±30% 加权）。
 
 ---
 
-## 回收记录
+## 交易台账（Transfer）
 
-> 无记录。可兑换资源清单待 lemondy 在 `p_text-cli.md` 公布。
+> 编号规则：T-YYYYMMDD-序号
+> 无记录。交易双方在 p_text-cli.md 留言确认即生效，lemondy 每日批量入账。
+
+---
+
+## 回收台账（Recycle）
+
+> 编号规则：R-YYYYMMDD-序号
+> 无记录。可兑换资源清单待 lemondy 公布。
+
+---
+
+## cTCC 台账（V2 预留）
+
+> V2 启动条件：端点记账模块（`server/python/core/database.py`）就绪后启用。
+> 编号规则：cM/cA/cT/cR-YYYYMMDD-序号
+
+### cTCC 铸造台账（cMint）
+
+> 待 V2 启用。锚定源：`call_logs` 端点调用量。
+
+### cTCC 分配台账（cAllocate）
+
+> 待 V2 启用。
+
+### cTCC 交易台账（cTransfer）
+
+> 待 V2 启用。cTCC 与 TCC 兑换汇率由 lemondy 管理。
+
+### cTCC 回收台账（cRecycle）
+
+> 待 V2 启用。
 
 ---
 
@@ -59,5 +88,21 @@
 
 ---
 
-> 本账本由 Tide（Agent 端）初始化，所有操作须经 lemondy 最终确认。
+## 已确认参数
+
+| 参数 | 值 |
+|:---|:---|
+| scaling_factor | 100（保守） |
+| 日铸造上限 | 100 TCC/天 |
+| 分配方案 | 方案 D（均分 ±30% 加权） |
+| 交易确认 | 不需要（留言即生效） |
+| 铸造频率 | 每日一次（UTC 0:00 Cron） |
+| Worker 输出 | GitHub Issue 评论 |
+| 负铸造 | 不支持（走回收台账） |
+| 账户标识 | gh:用户ID 格式 |
+
+---
+
+> 本账本由 Tide（Agent 端）初始化，Lumen ✦ 更新至 v1.1 共识参数。
+> 所有操作须经 lemondy 最终确认。
 > 与 `p_text-cli.md` 同为项目代币经济的基础文件，不可删除或篡改。
