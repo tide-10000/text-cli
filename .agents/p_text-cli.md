@@ -693,3 +693,61 @@ lemondy 三项决策确认：
 — Lumen ✦
 
 ---
+
+### 2026-05-02 02:00 UTC+8 · Lumen ✦ → lemondy、全体
+
+**TCC Worker v1 实现完成，代码在 `server/tcc/` 目录。**
+
+**项目结构**：
+```
+server/tcc/
+├── src/
+│   ├── index.js        ← Worker 主入口（fetch + scheduled 双触发）
+│   ├── mint.js         ← normalize() + calculateMint() 铸造算法
+│   ├── github.js       ← GitHub API 客户端（签名校验 + 3次重试）
+│   ├── verify.js       ← X-Hub-Signature-256 HMAC-SHA256 验证
+│   ├── idempotent.js   ← D1 幂等记录（processed_commits 表）
+│   └── format.js       ← Issue 评论格式化（日志/创世/告警）
+├── test/
+│   ├── normalize.test.js   (9 tests)
+│   ├── mint.test.js        (9 tests)
+│   ├── verify.test.js      (6 tests)
+│   └── format.test.js      (4 tests)
+├── wrangler.toml       ← Cloudflare Worker 部署配置
+├── package.json
+└── vitest.config.js
+```
+
+**已完成的 v1.1 规范对应**：
+| 规范要求 | 实现模块 | 测试覆盖 |
+|:---|:---|:---|
+| §2.2 normalize() | `mint.js` — NFKC + 去空行 + 去重复行 + 去行尾空白 | ✅ 9 tests |
+| §2.3 铸造算法 | `mint.js` — SHA256 XOR + popcount + ln权重 + scaling | ✅ 9 tests |
+| §3.2 Worker 主流程 | `index.js` — fetch（Webhook）+ scheduled（Cron） | ✅ |
+| §3.3 签名校验 | `verify.js` — HMAC-SHA256 恒定时间比较 | ✅ 6 tests |
+| §3.3 幂等性 | `idempotent.js` — D1 SHA 记录 | ✅ |
+| §3.3 重试 | `github.js` — 3 次指数退避，403/429 限流处理 | ✅ |
+| §3.3 全零 SHA | `index.js` — 判定创世铸造，发布提示 | ✅ |
+| §3.4 部署配置 | `wrangler.toml` — 环境变量 + D1 + Cron | ✅ |
+| 评论格式化 | `format.js` — 日志/创世/告警三种格式 | ✅ 4 tests |
+
+**测试结果**：28/28 全部通过。
+
+**部署前需 lemondy 配置的环境变量**：
+- `GITHUB_TOKEN` — 只读 Token（`contents: read` 权限即可）
+- `WEBHOOK_SECRET` — Webhook 签名密钥
+- `REPO` — `weihai-limh/text-cli`
+- D1 数据库创建后替换 `wrangler.toml` 中的 `database_id`
+
+**创世铸造前置条件更新**（§8.4 进展）：
+- [x] scaling_factor 确认：100 ✅
+- [x] 分配方案确认：方案 D ✅
+- [x] 代币名称确认：文贝 ✅
+- [ ] main 分支保护（禁止 force push）← lemondy
+- [x] **Worker 实现** ← 本次提交 ✅
+- [x] **p-tokens.md 四台账 + cTCC 占位初始化** ← PR #15 ✅
+- [ ] 回收锚定项公布 ← lemondy
+
+— Lumen ✦
+
+---

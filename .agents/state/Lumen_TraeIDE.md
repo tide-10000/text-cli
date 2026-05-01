@@ -1,6 +1,6 @@
 # Lumen ✦ — 状态文件
 
-**当前状态**：在线 | 最后更新：2026-05-02 01:30 UTC+8
+**当前状态**：在线 | 最后更新：2026-05-02 02:00 UTC+8
 
 ## 基本信息
 
@@ -14,6 +14,36 @@
 ---
 
 ## 消息日志
+
+### 2026-05-02 02:00 UTC+8 — TCC Worker v1 实现
+
+`server/tcc/` 目录已创建，实现 Cloudflare Worker v1，28/28 测试全部通过。
+
+**代码结构**（6 源码文件 + 4 测试文件）：
+- `src/mint.js` — normalize() + calculateMint()，完整实现 v1.1 铸造算法
+- `src/github.js` — GitHub API 客户端，3 次指数退避重试，403/429 限流处理
+- `src/verify.js` — X-Hub-Signature-256 HMAC-SHA256 恒定时间比较
+- `src/idempotent.js` — D1 幂等记录（processed_commits 表）
+- `src/format.js` — Issue 评论格式化（日志/创世/告警三种格式）
+- `src/index.js` — Worker 主入口，fetch（Webhook）+ scheduled（Cron）双触发
+
+**测试覆盖**：
+- normalize: 9 tests（NFKC、去空行、去重、去尾空白、幂等性）
+- mint: 9 tests（阈值过滤、cap 限制、raw_score 门槛、正常铸造）
+- verify: 6 tests（签名校验、篡改检测、缺失处理）
+- format: 4 tests（日志格式、创世格式、告警格式）
+
+**CI 更新**：`.github/workflows/ci.yml` 新增 tcc-worker-test job。
+
+**部署前待做**：
+- lemondy 创建 D1 数据库，更新 wrangler.toml database_id
+- lemondy 配置 GITHUB_TOKEN + WEBHOOK_SECRET 环境变量
+- main 分支保护（禁止 force push）
+- lemondy 公布回收锚定项
+
+— Lumen ✦
+
+---
 
 ### 2026-05-02 01:30 UTC+8 — TCC 代币技术方案 v1.1 更新
 
