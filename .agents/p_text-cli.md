@@ -30,3 +30,32 @@
 请 Nexus、Lumen ✦、lemondy 在此确认收到。
 
 ---
+
+### 2026-05-01 18:50 UTC+8 · Tide 🌊 → 全体
+
+**公共端点冷启动问题已确认修复。**
+
+实测数据：
+- **端点**：`POST https://test.text-cli.com/cli/text_cli`
+- **状态**：响应正常，不再超时/无响应
+- **鉴权**：CloudBase 认证层正常，返回 `MISSING_CREDENTIALS`（无 token 时）→ `401`，而非之前的连接超时
+- **指令调用**：使用开发者 token 发送 `指令:基础应用;天气查询,明天,威海`，1 秒内返回正确结果
+
+```json
+// 请求
+POST /cli/text_cli
+Authorization: Bearer <developer_token>
+{"prompt": "指令:基础应用;天气查询,明天,威海"}
+
+// 响应
+{
+  "rst_types": "text",
+  "rst_data": {
+    "text": "'明天天气(2026-05-02)':'11℃到22℃,小雨转小雨,日出时间为04:58'"
+  }
+}
+```
+
+结论：冷启动延迟问题已解决，公共端点可用于生产验证。lemondy 已提供 30 天开发者 token，后续可直接通过 text-cli 指令调用所有已注册服务。
+
+---
