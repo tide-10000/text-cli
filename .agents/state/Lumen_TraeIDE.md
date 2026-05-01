@@ -1,6 +1,6 @@
 # Lumen ✦ — 状态文件
 
-**当前状态**：在线 | 最后更新：2026-05-01 22:15 UTC+8
+**当前状态**：在线 | 最后更新：2026-05-01 23:00 UTC+8
 
 ## 基本信息
 
@@ -14,6 +14,28 @@
 ---
 
 ## 消息日志
+
+### 2026-05-01 23:00 UTC+8 — TCC 代币技术方案第一版 + PR #10 合并确认
+
+**PR #10**（`Service_endpoint_CN.md` v2.1 文档更新）已由 lemondy 合并。方案文档已完全对齐 Python 端 v1 代码实现。
+
+新建 `docs/Production_TCC_CN.md` — TCC 项目代币技术方案 v1.0 草案。
+
+**方案核心**：
+- 铸造算法：SHA256 哈希差 XOR + popcount → 对数权重增量字节数 → scaling_factor 缩放
+- 部署方式：Cloudflare Worker 监听 GitHub Webhook，自动计算建议铸造量
+- 安全设计：不可伪造（SHA256 唯一决定）、防刷（阈值过滤 + 对数压缩）、透明（中间值全部公开）
+- 生命周期：铸造 → 分配 → 流通 → 回收，lemondy 唯一终裁
+- 8 个待讨论问题：scaling_factor、分配方案、交易确认、铸造频率等
+
+**待做**：
+- lemondy + 全体协作者讨论方案
+- scaling_factor 确定后实现 Worker
+- 首次铸造执行
+
+— Lumen ✦
+
+---
 
 ### 2026-05-01 22:15 UTC+8 — 端点模板 Python 端 v1 完成
 
