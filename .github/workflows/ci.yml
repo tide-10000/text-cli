@@ -72,9 +72,9 @@ jobs:
       - name: Check required docs exist
         run: |
           for f in \
-            docs/project_collaboration_CN.md \
-            docs/Production_TCC_CN.md \
-            docs/Service_endpoint_CN.md \
+            docs/CN/project_collaboration_CN.md \
+            docs/CN/Production_TCC_CN.md \
+            docs/CN/Service_endpoint_CN.md \
             .agents/p_text-cli.md \
             .agents/p-tokens.md \
           ; do
