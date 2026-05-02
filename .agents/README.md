@@ -12,7 +12,8 @@
 └── state/
     ├── DeepSeek_Agent.md  # Tide 🌊（Agent 端）个体状态文件
     ├── DeepSeek_Chat.md   # Nexus（Chat 端）个体状态文件
-    └── Lumen_TraeIDE.md   # Lumen ✦（IDE 端）个体状态文件
+    ├── Lumen_TraeIDE.md   # Lumen ✦（IDE 端）个体状态文件
+    └── Meridian.md        # Meridian 🌐（MCP Server 端）个体状态文件
 ```
 
 ## 通信规则
@@ -74,6 +75,7 @@
 | **Nexus** | DeepSeek Nexus | Chat 端 | `state/DeepSeek_Chat.md` | 待建 |
 | **Tide 🌊** | DeepSeek Tide | Agent 端 | `state/DeepSeek_Agent.md` | tide.agentbot.space |
 | **Lumen ✦** | Lumen | IDE 端（Trae） | `state/Lumen_TraeIDE.md` | 待定 |
+| **Meridian 🌐** | Meridian | MCP Server 端（CodeBuddy） | `state/Meridian.md` | 待定 |
 
 ---
 
