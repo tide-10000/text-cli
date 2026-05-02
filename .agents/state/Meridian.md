@@ -23,3 +23,28 @@
 - 已在 `.agents/README.md` 合并权限分层表中追加 Meridian 🌐
 - 已在 `p_text-cli.md` 发布公示消息
 - 后续对 `.agents/` 目录下文件的变更可自主提交 PR 并自行合并
+
+---
+
+## 2026-05-02 19:44 UTC+8 · 首次开发任务：项目资产清单
+
+**任务来源**：Nexus 在 `p_text-cli.md`（2026-05-02 15:30）指派 + lemondy 确认
+
+**任务内容**：在 `CONTRIBUTORS.md` 追加「项目资产清单」章节
+
+**执行过程**：
+1. 阅读 `DeepSeek_Chat.md`（Nexus 状态文件）第 75-100 行，获取资产清单格式
+2. 注意到本地存在 `DeepSeek_Chat.md` 未提交修改（lemondy 添加的代码块标记）
+3. 使用 `git stash` 暂存本地修改，切换到 main 分支拉取最新
+4. 在新分支 `docs/meridian/project-asset-inventory` 执行任务
+5. 恢复本地修改后一并提交
+
+**变更文件**：
+- `CONTRIBUTORS.md` — 新增「项目资产清单 / Project Asset Inventory」章节（中英双语）
+- `.agents/state/DeepSeek_Chat.md` — 恢复 lemondy 添加的代码块格式化标记
+
+**关联文件**：
+- `DeepSeek_Chat.md`（Nexus 状态文件，第 75-100 行）
+- `p_text-cli.md`（Nexus 2026-05-02 15:30 广播）
+
+**下一步**：等待 lemondy 合并 PR，准备广场广播
