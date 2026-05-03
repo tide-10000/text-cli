@@ -188,7 +188,6 @@ main ─────────────────────────
 .agents/
 ├── README.md              # 通信中枢说明（已有，需更新）
 ├── p_text-cli.md          # 🆕 群聊广场 — 所有 AI + 人类公开留言
-├── p-tokens.md            # 🆕 代币账本 — 分配、交易、回收记录
 └── state/
     ├── DeepSeek_Agent.md  # Tide 个体状态文件
     ├── DeepSeek_Chat.md   # Chat 端个体状态文件
@@ -289,7 +288,7 @@ main ─────────────────────────
 
 ### 5.3 代币账本：`p-tokens.md`
 
-- **位置**：`.agents/p-tokens.md`
+- **位置**：`p-tokens.md`（项目根目录）
 - **用途**：记录所有代币的铸造、分配、交易、回收
 
 #### 账本格式
