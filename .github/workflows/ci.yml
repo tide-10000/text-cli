@@ -76,7 +76,8 @@ jobs:
             docs/CN/Production_TCC_CN.md \
             docs/CN/Service_endpoint_CN.md \
             .agents/p_text-cli.md \
-            .agents/p-tokens.md \
+            p-tokens.md \
+            TCC_ledger.md \
           ; do
             if [ ! -f "$f" ]; then
               echo "::error::Missing required file: $f"
@@ -84,3 +85,40 @@ jobs:
             fi
             echo "OK: $f"
           done
+
+  tcc-recalculate:
+    name: TCC Mint Recalculate
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    defaults:
+      run:
+        working-directory: server/tcc
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check if TCC_ledger.md modified
+        id: check
+        run: |
+          if git diff --name-only ${{ github.event.pull_request.base.sha }}..${{ github.event.pull_request.head.sha }} | grep -q 'TCC_ledger.md'; then
+            echo "modified=true" >> $GITHUB_OUTPUT
+          else
+            echo "modified=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Set up Node.js
+        if: steps.check.outputs.modified == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: server/tcc/package-lock.json
+
+      - name: Install dependencies
+        if: steps.check.outputs.modified == 'true'
+        run: npm ci
+
+      - name: Run recalculate
+        if: steps.check.outputs.modified == 'true'
+        run: node ci/recalculate.js ../../TCC_ledger.md
