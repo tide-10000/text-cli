@@ -21,9 +21,9 @@
 | 实现方式 | call/（消费者） | cli/（生产者） |
 |----------|----------------|----------------|
 | **Python** | `call/python/` — SDK + Skill 技能封装 | `cli/python/` — @register 装饰器 + HTTP 服务 |
+| **JS** | `call/js/` — Node.js fetch 调用 | 待扩展 |
 | **Shell** | `call/shell/` — 最简 curl 调用 | — |
 | **NoCode** | `call/nocode/` — Agent 技能定义模板 | `cli/nocode/` — Markdown → 指令转化引擎 |
-| **JS** | 待扩展 | 待扩展 |
 
 ## 60 秒上手
 
@@ -40,6 +40,12 @@ export TEXT_CLI_TOKEN="your-token"
 # Python SDK
 from call.python.call import call_directive
 result = call_directive("指令:天气;查询,明天,威海")
+```
+
+```js
+// Node.js
+const { callDirective } = require('./call/js/call');
+const result = await callDirective('指令:天气;查询,明天,威海');
 ```
 
 ### 作为生产者：发布一条指令
@@ -76,6 +82,8 @@ agent/
 │   │   └── skills/            ← 预置技能（天气、翻译）
 │   ├── shell/
 │   │   └── call.sh            ← 最简 curl 封装
+│   ├── js/
+│   │   └── call.js            ← Node.js fetch 调用（零依赖）
 │   └── nocode/
 │       └── text-cli-agent-skill.md  ← Agent 技能定义模板
 └── cli/                       ← 生产者：发布指令
