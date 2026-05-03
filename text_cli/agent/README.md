@@ -23,7 +23,7 @@
 | **Python** | `call/python/` — SDK + Skill 技能封装 | `cli/python/` — @register 装饰器 + HTTP 服务 |
 | **JS** | `call/js/` — Node.js fetch 调用 | 待扩展 |
 | **Shell** | `call/shell/` — 最简 curl 调用 | — |
-| **NoCode** | `call/nocode/` — Agent 技能定义模板 | `cli/nocode/` — Markdown → 指令转化引擎 |
+| **NoCode** | `CN/call/nocode/` — Agent 技能定义模板 | `CN/cli/nocode/` — Markdown → 指令转化引擎 |
 
 ## 60 秒上手
 
@@ -64,7 +64,7 @@ def weather(params):
 
 ```bash
 # 写好你的经验 Markdown，一行启动
-cd cli/nocode
+cd CN/cli/nocode
 python markdown_converter.py 盆栽急救手册.md
 # → 自动解析、注册、启动 HTTP 服务
 ```
@@ -84,16 +84,17 @@ agent/
 │   │   └── call.sh            ← 最简 curl 封装
 │   ├── js/
 │   │   └── call.js            ← Node.js fetch 调用（零依赖）
-│   └── nocode/
-│       └── text-cli-agent-skill.md  ← Agent 技能定义模板
+├── CN/                      ← 中文本地化实现
+│   ├── call/nocode/
+│   │   └── text-cli-agent-skill.md  ← Agent 技能定义模板
+│   └── cli/nocode/
+│       ├── markdown_converter.py    ← Markdown → 指令 转化引擎
+│       └── 盆栽急救手册.md          ← 结构化经验文档示例
 └── cli/                       ← 生产者：发布指令
     ├── README.md
-    ├── python/                ← Python 指令服务器
-    │   ├── cli.py             ← @register + Schema + HTTP
-    │   └── handlers/          ← 指令处理器（自动发现）
-    └── nocode/                ← 非代码模式
-        ├── markdown_converter.py  ← Markdown→指令 转化引擎
-        └── 盆栽急救手册.md        ← 结构化经验文档示例
+    └── python/                ← Python 指令服务器
+        ├── cli.py             ← @register + Schema + HTTP
+        └── handlers/          ← 指令处理器（自动发现）
 ```
 
 ## 与其他模块的关系

@@ -85,19 +85,17 @@ cli/
 │   └── handlers/
 │       ├── __init__.py
 │       └── sample.py        ← 三类转化示例（API / 工具 / 知识库）
-├── nocode/                   ← 非代码模式
-│   ├── markdown_converter.py ← 文档解析 + 自动注册 + 检索回答
-│   └── 盆栽急救手册.md       ← 结构化经验文档（Markdown → 指令）
-└── (js/ 等按需扩展)
+└── (NoCode 实现见 CN/cli/nocode/)
 ```
 
 ## 完整示例：Markdown → 指令
 
-`nocode/markdown_converter.py` 是 **三步转化法** 的完整实现，参考 `docs/CN/Markdown2Text-cli_CN.md`：
+`CN/cli/nocode/markdown_converter.py` 是 **三步转化法** 的完整实现，参考 `docs/CN/Markdown2Text-cli_CN.md`：
 
 ```bash
 # 启动
-python examples/markdown_converter.py examples/盆栽急救手册.md
+cd CN/cli/nocode
+python markdown_converter.py 盆栽急救手册.md
 
 # 调用
 curl -X POST http://localhost:8000/cli/text_cli \

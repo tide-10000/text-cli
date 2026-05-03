@@ -897,7 +897,7 @@ text_cli/agent/
 
 **第一步：编写经验文档**
 
-按固定结构写 Markdown（参考 `cli/nocode/盆栽急救手册.md`）：
+按固定结构写 Markdown（参考 `agent/CN/cli/nocode/盆栽急救手册.md`）：
 
 ```markdown
 # 你的经验标题
@@ -919,7 +919,7 @@ text_cli/agent/
 **第二步：启动指令服务**
 
 ```bash
-cd text_cli/agent/cli/nocode
+cd text_cli/agent/CN/cli/nocode
 python markdown_converter.py 盆栽急救手册.md
 ```
 
@@ -934,6 +934,8 @@ curl -X POST http://localhost:8000/cli/text_cli \
 `markdown_converter.py` 会自动：解析 Markdown → 提取 `## 指令定义` 元数据 → 按 `### 植物` + `#### 症状` 建立检索索引 → 注册为 text-cli 指令处理器 → 启动 HTTP 服务。
 
 完整流程参考 `docs/CN/Markdown2Text-cli_CN.md`。
+
+> 实现代码位于 `text_cli/agent/CN/cli/nocode/`。
 
 ### 8.3 Python 模式：@register 装饰器（python）
 
