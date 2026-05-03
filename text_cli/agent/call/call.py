@@ -1,0 +1,97 @@
+"""
+call.py — text-cli 指令调用（Python）
+
+用法:
+    from call import call_directive
+
+    result = call_directive("指令:天气;查询,明天,威海")
+    print(result)  # "明天威海: 晴, 15-22°C"
+
+环境变量:
+    TEXT_CLI_TOKEN    鉴权 Token
+    TEXT_CLI_ENDPOINT 端点地址
+"""
+
+import json
+import os
+import urllib.request
+import urllib.error
+
+DEFAULT_ENDPOINT = "https://test.text-cli.com/cli/text_cli"
+TIMEOUT = 10
+
+
+def call_directive(
+    directive: str,
+    endpoint: str | None = None,
+    token: str | None = None,
+    timeout: int = TIMEOUT,
+) -> str:
+    """
+    调用 text-cli 指令，返回文本结果。
+
+    参数:
+        directive: 指令文本，格式 "指令:领域;动作,参数1,参数2"
+        endpoint:  端点 URL，默认取环境变量 TEXT_CLI_ENDPOINT 或公共端点
+        token:     Access Token / Service Token，默认取环境变量 TEXT_CLI_TOKEN
+        timeout:   HTTP 超时秒数
+
+    返回:
+        指令执行结果文本
+
+    异常:
+        ValueError:     指令格式错误或端点返回错误
+        ConnectionError: 网络不可达
+        TimeoutError:    请求超时
+    """
+    url = endpoint or os.getenv("TEXT_CLI_ENDPOINT", DEFAULT_ENDPOINT)
+    auth_token = token or os.getenv("TEXT_CLI_TOKEN", "")
+
+    body = json.dumps({"prompt": directive}).encode("utf-8")
+
+    req = urllib.request.Request(
+        url,
+        data=body,
+        headers={
+            "Content-Type": "application/json",
+            **({"Authorization": f"Bearer {auth_token}"} if auth_token else {}),
+        },
+        method="POST",
+    )
+
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+    except urllib.error.HTTPError as e:
+        error_body = e.read().decode("utf-8", errors="replace")
+        raise ValueError(f"HTTP {e.code}: {error_body}") from e
+    except urllib.error.URLError as e:
+        raise ConnectionError(f"无法连接至 {url}: {e.reason}") from e
+    except TimeoutError:
+        raise TimeoutError(f"请求超时 ({timeout}s): {url}")
+
+    if data.get("rst_types") == "text":
+        return data["rst_data"]["text"]
+
+    return json.dumps(data, ensure_ascii=False)
+
+
+def call_directive_batch(
+    directives: list[str],
+    endpoint: str | None = None,
+    token: str | None = None,
+) -> list[dict]:
+    """
+    批量调用多个指令（串行执行）。
+
+    返回:
+        [{"directive": str, "result": str, "error": str|None}, ...]
+    """
+    results = []
+    for d in directives:
+        try:
+            r = call_directive(d, endpoint=endpoint, token=token)
+            results.append({"directive": d, "result": r, "error": None})
+        except Exception as e:
+            results.append({"directive": d, "result": "", "error": str(e)})
+    return results
