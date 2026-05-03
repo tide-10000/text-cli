@@ -129,47 +129,68 @@ normalize(text):
 
 ## 三、Cloudflare Worker 实现
 
+> **v2 update (2026-05-03)**：Worker 从 Issue 评论模式升级为 PR 模式。
+> 详见 PR #33 + `铸造信源双文件架构.md`。
+
 ### 3.1 架构
 
 ```
-触发方式：每日 UTC 0:00 Cron 定时触发
+触发方式：每日 UTC 0:00 Cron + GitHub Webhook (push events)
         │
         ▼
 Cloudflare Worker
         │
-        ├── 1. 获取 p_text-cli.md 最新 commit
-        │      └── 通过 GitHub API 获取过去 24 小时的 commit 历史
+        ├── 1. 获取 p_text-cli.md diff
+        │      ├── Webhook: body.before..body.after
+        │      └── Cron: 24 小时内的 oldest..newest commit
         │
-        ├── 2. 计算过去 24 小时的累计增量
-        │      ├── OldContent = 24 小时前的版本
-        │      └── NewContent = 当前最新版本
-        │
-        ├── 3. normalize → 计算铸造量
+        ├── 2. normalize → 计算铸造量
         │      ├── NFKC + 去空行 + 去重复行
         │      ├── SHA256(Old) ⊕ SHA256(New) → hash_diff_bits
         │      ├── delta_bytes, raw_score
         │      └── mint_ceiling = min(round(raw_score/100), 100)
         │
-        ├── 4. 输出结果
-        │      └── 自动写入专用 GitHub Issue 评论
+        ├── 3. 创建铸造分支
+        │      ├── getRef(main) → createBranch(tcc-mint/YYYY-MM-DD)
+        │      └── 已存在则复用（幂等）
         │
-        └── 5. 等待 lemondy 确认
-               └── lemondy 在 Issue 中以 👍 或文字确认
+        ├── 4. 追加铸造记录到 TCC_ledger.md
+        │      ├── getFileInfo(TCC_ledger.md) → 拿 blob SHA（防并发冲突）
+        │      └── createOrUpdateFile(TCC_ledger.md, ledgerSha)
+        │
+        ├── 5. 创建 PR
+        │      ├── 已存在当天 PR 时更新内容
+        │      └── PR 正文含完整铸造参数 + 哈希校验 + 复算方法
+        │
+        ▼
+  GitHub PR（分支: tcc-mint/YYYY-MM-DD）
+        │
+    ┌───┴───┐
+    ▼       ▼
+  CI 复算   CODEOWNERS
+  (验证)    (lemondy 审批门禁)
+    │       │
+    └───┬───┘
+        │  都通过
+        ▼
+  lemondy 合并 PR → TCC_ledger.md 追加生效
 ```
 
 ### 3.2 源码结构
 
-代码位于 `server/tcc/`，采用模块化设计（6 源码 + 4 测试）：
+代码位于 `server/tcc/`，采用模块化设计（6 源码 + 1 CI 脚本 + 4 测试）：
 
 ```
 server/tcc/
 ├── src/
-│   ├── index.js        ← Worker 主入口（fetch + scheduled 双触发）
+│   ├── index.js        ← Worker 主入口（fetch + scheduled 双触发，PR 模式）
 │   ├── mint.js         ← normalize() + calculateMint() 铸造算法
-│   ├── github.js       ← GitHub API 客户端（签名校验 + 3 次重试）
+│   ├── github.js       ← GitHub API 客户端（分支/文件/PR + 3 次重试）
 │   ├── verify.js       ← X-Hub-Signature-256 HMAC-SHA256 验证
 │   ├── idempotent.js   ← D1 幂等记录（processed_commits 表）
-│   └── format.js       ← Issue 评论格式化（日志/创世/告警）
+│   └── format.js       ← 格式化（Issue 评论 + 铸造账本记录 + PR 正文）
+├── ci/
+│   └── recalculate.js  ← CI 自动复算（解析 TCC_ledger.md → 复现算法 → 对比）
 ├── test/
 │   ├── normalize.test.js   (9 tests)
 │   ├── mint.test.js        (9 tests)
@@ -260,10 +281,11 @@ const DEFAULT_CONFIG = {
 
 | 变量 | 类型 | 默认值 | 说明 |
 |:---|:---|:---|:---|
-| `GITHUB_TOKEN` | Secret | — | GitHub API Token，需 `contents:read` + `issues:write` |
+| `GITHUB_TOKEN` | Secret | — | GitHub API Token，需 `contents:write` + `pull_requests:write` + `issues:write` |
 | `WEBHOOK_SECRET` | Secret | — | Webhook 签名密钥 |
 | `REPO` | Variable | — | 仓库全名，如 `weihai-limh/text-cli` |
 | `ANCHOR_FILE` | Variable | `.agents/p_text-cli.md` | 锚定文件路径 |
+| `LEDGER_FILE` | Variable | `TCC_ledger.md` | 铸造账本文件路径 |
 | `SCALING_FACTOR` | Variable | `100` | 铸造缩放因子 |
 | `DAILY_MINT_CAP` | Variable | `100` | 单日铸造上限 |
 | `DELTA_BYTES_THRESHOLD` | Variable | `10` | delta_bytes 最小阈值 |
