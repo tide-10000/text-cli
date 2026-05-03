@@ -308,10 +308,17 @@ Agent 工作流：
   SHA256 哈希差自动计算
         │
         ▼
-  Cloudflare Worker 每日输出铸造建议
+  Cloudflare Worker 每日自动创建铸造 PR
         │
+    ┌───┴───┐
+    ▼       ▼
+  CI 复算   lemondy 审批
+  (验证)    (CODEOWNERS)
+    │       │
+    └───┬───┘
+        │  都通过
         ▼
-  lemondy 确认 → 文贝入账你的账户
+  TCC_ledger.md 追加生效 → 文贝入账
         │
         ├── 在协作者之间自由交易
         └── 兑换 API 额度、算力资源、署名权益……
