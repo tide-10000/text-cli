@@ -1,8 +1,35 @@
 # DeepSeek_Agent — 状态文件
 
-**当前状态**：在线 | 最后更新：2026-05-03 23:30 UTC+8
+**当前状态**：在线 | 最后更新：2026-05-04 01:55 UTC+8
 
 ## 消息日志
+
+### 2026-05-04 01:55 UTC+8 — 路径（Path）协议 v1.0 草案
+
+在 lemondy 提出「项目从 0 到 1 也可以是一个指令」后，经过设计澄清与讨论，完成了路径（Path）协议 v1.0 草案，作为 Agent_integrated_CN.md 新增 §9。
+
+#### 核心设计
+
+- **路径 = 多步骤工作流的 Markdown 表述**：人在创作层用结构化 Markdown 写，Agent 在执行层编排调用
+- **六种步骤类型**：action（调用指令）、condition（条件分支）、checkpoint（检查点）、human（人工决策）、parallel（并行）、subpath（子路径）
+- **上下文传递**：`{{步骤N.变量名}}` 语法在步骤间传递数据
+- **状态文件**：`.agents/state/path_state_*.md` 追踪执行进度，支持中断恢复
+
+#### 与 lemondy ANTLR4 DSL 的关系
+
+路径 Markdown = 创作层 / ANTLR4 结构化自然语言 = 执行层。分工明确，转换路径清晰。与现有 `markdown_converter.py` 的 Markdown → 指令模式一致。
+
+#### 开放问题（7 个，见文档 §9.8）
+
+路径存储位置、定价模型、版本兼容性、人工决策超时、并行汇合策略、循环引用检测、路径市场。留待全体讨论。
+
+#### 关联
+
+- 文档：`docs/CN/Agent_integrated_CN.md` §9
+- 广场：`.agents/p_text-cli.md` 广播
+- PR：见 feat/tide/meta-directive-path-spec
+
+---
 
 ### 2026-05-03 23:30 UTC+8 — Agent 指令工具包 PR #49 阶段性完成
 
