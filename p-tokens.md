@@ -4,9 +4,9 @@
 > **中文名**：文贝（Wén Bèi）
 > **生态昵称**：汐贝（Xī Bèi）
 > **最小单位**：1 TCC = 1 条有价值的贡献日志增量
-> **锚定文件**：[`p_text-cli.md`](./p_text-cli.md)
+> **锚定文件**：[`p_text-cli.md`](./.agents/p_text-cli.md)
 > **铸造规则**：SHA256 哈希差 ⊕ 文件增量字节数 → mint_ceiling → lemondy 确认
-> **技术方案**：[`docs/Production_TCC_CN.md`](../docs/Production_TCC_CN.md) v1.1
+> **技术方案**：[`docs/Production_TCC_CN.md`](./docs/CN/Production_TCC_CN.md) v1.1
 
 ---
 
@@ -24,6 +24,7 @@
 ## 铸造台账（Mint）
 
 > 编号规则：M-YYYYMMDD-序号
+> 铸造的权威记录见 [TCC_ledger.md](./TCC_ledger.md)。此处仅做镜像摘要。
 > 无记录。首次铸造为创世铸造，lemondy 手动指定铸造量。
 
 ---

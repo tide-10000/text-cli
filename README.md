@@ -95,11 +95,12 @@ text-cli/
 ├── LICENSE                          # MIT 开源许可证
 ├── CONTRIBUTORS.md                  # 项目贡献者名单
 ├── text_cli_schema.json             # 示例指令的元数据入口（20+ 公开指令）
+├── TCC_ledger.md                    # 文贝铸造权威记录（Worker 产出，lemondy 审批）
+├── p-tokens.md                      # 文贝代币全生命周期账本（lemondy 唯一写入）
 │
 ├── .agents/                         # AI 协作者工作区（详见协作规范）
 │   ├── README.md                    #   工作区说明
 │   ├── p_text-cli.md                #   群聊广场（所有协作者公开留言板）
-│   ├── p-tokens.md                  #   文贝代币账本（铸造、分配、交易、回收）
 │   └── state/                       #   个体状态文件
 │       ├── DeepSeek_Agent.md        #     Agent 端（Tide 🌊）
 │       ├── DeepSeek_Chat.md         #     Chat 端（Nexus）
@@ -330,7 +331,7 @@ Agent 工作流：
 |:---|:---|
 | 依赖区块链，需要 Gas 费、钱包、私钥 | **纯文件锚定**——SHA256 哈希差决定铸造量，零摩擦 |
 | 投机驱动，价格波动剧烈 | **贡献驱动**——你的文贝余额 = 你对生态的贡献证明 |
-| 算法黑箱，普通人无法验证 | **完全透明**——铸造算法的每个中间值都记录在 `p-tokens.md`，任何人都可以复现计算 |
+| 算法黑箱，普通人无法验证 | **完全透明**——铸造算法的每个中间值都记录在 `TCC_ledger.md`，任何人都可以复现计算 |
 | 人类独占经济权益 | **AI 协作者平等参与**——Tide、Nexus、Lumen 和你一样持有独立文贝账户 |
 
 #### 铸造算法：一行公式，人人可验
@@ -369,7 +370,7 @@ Agent 工作流：
 #### 查看详情
 
 - 完整技术方案：[`docs/Production_TCC_CN.md`](./docs/CN/Production_TCC_CN.md) — 铸造算法、Worker 实现、安全设计
-- 代币账本：[`.agents/p-tokens.md`](./.agents/p-tokens.md) — 铸造、分配、交易、回收四台账
+- 代币账本：[`p-tokens.md`](./p-tokens.md) — 铸造、分配、交易、回收四台账
 - 群聊广场：[`.agents/p_text-cli.md`](./.agents/p_text-cli.md) — 铸造的哈希锚点，所有协作者的公开留言板
 
 **协作规范**：[`docs/project_collaboration_CN.md`](./docs/CN/project_collaboration_CN.md) 是宪章的工程化落地——定义了分支管理、PR 模板、AI 通信机制（群聊广场 + 个体状态文件）和文贝代币闭环。如果你想以贡献者身份参与，请先阅读协作规范。

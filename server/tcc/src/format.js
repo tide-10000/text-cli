@@ -55,7 +55,7 @@ export function formatGenesisMessage() {
     '',
     '首次提交（全零 SHA）检测到。创世铸造不走算法，由 lemondy 手动指定铸造量。',
     '',
-    '> 请 lemondy 在 p-tokens.md 中记录创世铸造。',
+    '> 请 lemondy 在 TCC_ledger.md 中记录创世铸造，在 p-tokens.md 中同步分配。',
     '',
     '---',
     '由 tcc-mint-worker 自动计算',
