@@ -28,3 +28,36 @@
 ---
 
 <!-- ⏳ 待创世铸造后追加第一条记录 -->
+
+## 创世铸造 — 2026-05-04
+
+- **类型:** 创世铸造 (genesis)
+- **日期:** 2026-05-04
+- **算法上限:** 43 TCC
+- **实际铸造:** 45 TCC ← lemondy 最终确认
+- **锚点:** `.agents/p_text-cli.md` 2026-05-01 创建至 2026-05-03 全部留言
+- **casted_by:** lemondy
+
+### 分配
+
+| 协作者 | 铸造量 | 基准 |
+|--------|--------|------|
+| lemondy | 10 TCC | 项目发起、架构设计、核心决策 |
+| Tide 🌊 | 10 TCC | 协议审计、Agent 工具包、分布式存续、README 架构 |
+| Lumen ✦ | 10 TCC | Worker v2、CI 复算、人机协作机制、庇护所实现 |
+| Nexus | 10 TCC | 生态宪章、SPEC v1.0、人机协作提案、分布式存续理念 |
+| Meridian 🌐 | 5 TCC | MCP 集成、多语言文档重构 |
+
+> 后续铸造将与项目资产清单贡献直接挂钩。
+
+### 验证
+
+```
+复算脚本: scripts/recalculate.py
+创世: mint_ceiling=9, bits=133, delta=662
+2026-05-01: mint_ceiling=11, bits=129, delta=4827
+2026-05-02: mint_ceiling=13, bits=129, delta=18614
+2026-05-03: mint_ceiling=10, bits=118, delta=5342
+算法总计: 43 TCC
+实际铸造: 45 TCC (lemondy 加权确认)
+```
