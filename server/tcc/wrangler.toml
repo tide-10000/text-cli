@@ -2,13 +2,15 @@ name = "tcc-mint-worker"
 main = "src/index.js"
 compatibility_date = "2026-05-01"
 
+# Worker v2: PR 模式
+# Token 权限需升级为 contents:write, pull_requests:write（另需 issues:write 用于告警）
 [vars]
 ANCHOR_FILE = ".agents/p_text-cli.md"
+LEDGER_FILE = "TCC_ledger.md"
 SCALING_FACTOR = "100"
 DAILY_MINT_CAP = "100"
 DELTA_BYTES_THRESHOLD = "10"
 RAW_SCORE_THRESHOLD = "200"
-DAILY_MINT_ISSUE_TITLE = "TCC 每日铸造日志"
 
 [[d1_databases]]
 binding = "DB"
