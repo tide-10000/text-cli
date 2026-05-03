@@ -50,14 +50,16 @@
 
 我们准备了 20+ 个免费指令，放在公共端点 `test.text-cli.com`，无需自建任何东西，立刻感受。
 
-### 1. 获取免费令牌
-访问 `https://test.text-cli.com` 注册/登录，获得平台 `Access Token`（有每日免费额度）。
+### 1. 项目网站即将上线
+
+项目官网正在建设中，上线后你可以通过**关联 GitHub 账号**获得每日免费试用额度——无需单独注册，即可直接调用公共端点的全部指令。
+
+> 💡 **免注册试用**：调用时无需携带个人 Access Token，所有请求由后台公共账号承载每日配额。需要长期调用？发送邮件至 `limh@10000.world` 申请独立账号。
 
 ### 2. 发送你的第一条指令
 ```bash
 curl -X POST 'https://test.text-cli.com/cli/text_cli' \
   -H 'Content-Type: application/json' \
-  -H 'Authorization: Bearer <你的Access Token>' \
   --data-raw '{"prompt": "指令:基础应用;天气查询,明天,威海"}'
 ```
 返回示例：
