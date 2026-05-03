@@ -1,15 +1,31 @@
 /**
  * TCC Mint Worker — Main Entry
  * ref: docs/Production_TCC_CN.md §3
+ *
+ * v2: PR 模式 — Worker 将铸造结果通过 GitHub PR 提交，
+ *     写入 TCC_ledger.md，lemondy 审批后合并生效。
  */
 
 import { calculateMint } from './mint.js';
 import { verifySignature } from './verify.js';
 import { isProcessed, markProcessed, initIdempotencyTable } from './idempotent.js';
-import { getFileContent, getRecentCommits, findOrCreateIssue, postIssueComment } from './github.js';
-import { formatDailyResult, formatGenesisMessage, formatAlert } from './format.js';
+import {
+  getFileContent,
+  getFileInfo,
+  getRecentCommits,
+  findOrCreateIssue,
+  postIssueComment,
+  getRef,
+  createBranch,
+  createOrUpdateFile,
+  createPR,
+  findOpenPR,
+} from './github.js';
+import { formatLedgerRecord, formatPRBody, formatGenesisMessage, formatAlert } from './format.js';
 
 const ZERO_SHA = '0000000000000000000000000000000000000000';
+const LEDGER_FILE = 'TCC_ledger.md';
+const MAIN_BRANCH = 'main';
 
 function parseRepo(env) {
   const [owner, repo] = (env.REPO || '').split('/');
@@ -23,30 +39,140 @@ async function getConfig(env) {
     deltaBytesThreshold: parseInt(env.DELTA_BYTES_THRESHOLD, 10) || 10,
     rawScoreThreshold: parseInt(env.RAW_SCORE_THRESHOLD, 10) || 200,
     anchorFile: env.ANCHOR_FILE || '.agents/p_text-cli.md',
-    dailyIssueTitle: env.DAILY_MINT_ISSUE_TITLE || 'TCC 每日铸造日志',
+    ledgerFile: env.LEDGER_FILE || LEDGER_FILE,
   };
 }
 
-async function computeAndPost(owner, repo, beforeSha, afterSha, env, config) {
-  const { anchorFile, dailyIssueTitle } = config;
+function todayStr() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+async function getOrCreateBranch(owner, repo, branchName, env) {
+  const mainRef = await getRef(owner, repo, MAIN_BRANCH, env);
+  const baseSha = mainRef.object.sha;
+
+  const result = await createBranch(owner, repo, branchName, baseSha, env);
+
+  if (result.existed) {
+    const ref = await getRef(owner, repo, branchName, env);
+    return { sha: ref.object.sha };
+  }
+
+  return { sha: baseSha };
+}
+
+function getCycleNumber(existingLedgerContent) {
+  if (!existingLedgerContent || existingLedgerContent.trim() === '') return 1;
+
+  const matches = existingLedgerContent.match(/## 周期 #(\d+)/g);
+  if (!matches || matches.length === 0) return 1;
+
+  const nums = matches.map(m => parseInt(m.match(/#(\d+)/)[1], 10));
+  return Math.max(...nums) + 1;
+}
+
+async function computeAndCreatePR(owner, repo, beforeSha, afterSha, env, config) {
+  const { anchorFile } = config;
+  const date = todayStr();
+  const branchName = `tcc-mint/${date}`;
 
   const oldContent = beforeSha === ZERO_SHA
     ? ''
     : await getFileContent(owner, repo, anchorFile, beforeSha, env);
 
   const newContent = await getFileContent(owner, repo, anchorFile, afterSha, env);
-
   const result = await calculateMint(oldContent, newContent, config);
 
-  const issueNumber = await findOrCreateIssue(owner, repo, dailyIssueTitle, env);
+  const commitRange = beforeSha === ZERO_SHA
+    ? afterSha
+    : `${beforeSha.slice(0, 7)}..${afterSha.slice(0, 7)}`;
 
-  const comment = result.type === 'genesis'
-    ? formatGenesisMessage()
-    : formatDailyResult(result, afterSha);
+  if (result.type === 'genesis' || beforeSha === ZERO_SHA) {
+    const genesisPrTitle = `TCC 创世铸造 — ${date}`;
+    const existingGenesisPR = await findOpenPR(owner, repo, `weihai-limh:tcc-mint/${date}`, env);
 
-  await postIssueComment(owner, repo, issueNumber, comment, env);
+    if (existingGenesisPR) {
+      return { type: 'genesis', pr_url: existingGenesisPR.html_url, duplicate: true };
+    }
 
-  return result;
+    await getOrCreateBranch(owner, repo, branchName, env);
+
+    const ledgerInfo = await getFileInfo(owner, repo, LEDGER_FILE, MAIN_BRANCH, env);
+    const ledgerContent = ledgerInfo
+      ? atob(ledgerInfo.content)
+      : '';
+    const ledgerSha = ledgerInfo ? ledgerInfo.sha : null;
+
+    const ledgerRecord = formatLedgerRecord({ type: 'genesis' }, 0, commitRange);
+
+    await createOrUpdateFile(
+      owner, repo, LEDGER_FILE,
+      ledgerContent + ledgerRecord,
+      `tcc-mint: 创世铸造 — ${date}`,
+      branchName,
+      ledgerSha,
+      env,
+    );
+
+    const pr = await createPR(
+      owner, repo,
+      genesisPrTitle,
+      branchName,
+      MAIN_BRANCH,
+      formatPRBody({ type: 'genesis' }, 0, commitRange),
+      env,
+    );
+
+    return { type: 'genesis', pr_url: pr.html_url, pr_number: pr.number };
+  }
+
+  const existingPR = await findOpenPR(owner, repo, `weihai-limh:tcc-mint/${date}`, env);
+  const prTitle = `TCC 每日铸造 — ${date}`;
+
+  await getOrCreateBranch(owner, repo, branchName, env);
+
+  const ledgerInfo = await getFileInfo(owner, repo, LEDGER_FILE, MAIN_BRANCH, env);
+  const ledgerContent = ledgerInfo ? atob(ledgerInfo.content) : '';
+  const ledgerSha = ledgerInfo ? ledgerInfo.sha : null;
+  const cycleNum = getCycleNumber(ledgerContent);
+
+  const ledgerRecord = formatLedgerRecord(result, cycleNum, commitRange);
+
+  await createOrUpdateFile(
+    owner, repo, LEDGER_FILE,
+    ledgerContent + ledgerRecord,
+    `tcc-mint: 周期 #${cycleNum} — ${date}`,
+    branchName,
+    ledgerSha,
+    env,
+  );
+
+  if (existingPR) {
+    return {
+      type: 'daily',
+      cycle: cycleNum,
+      mint_ceiling: result.mint_ceiling,
+      pr_url: existingPR.html_url,
+      updated: true,
+    };
+  }
+
+  const pr = await createPR(
+    owner, repo,
+    prTitle,
+    branchName,
+    MAIN_BRANCH,
+    formatPRBody(result, cycleNum, commitRange, result.old_hash, result.new_hash),
+    env,
+  );
+
+  return {
+    type: 'daily',
+    cycle: cycleNum,
+    mint_ceiling: result.mint_ceiling,
+    pr_url: pr.html_url,
+    pr_number: pr.number,
+  };
 }
 
 export default {
@@ -85,9 +211,8 @@ export default {
     const afterSha = body.after;
 
     if (beforeSha === ZERO_SHA) {
-      const issueNumber = await findOrCreateIssue(owner, repo, config.dailyIssueTitle, env);
-      await postIssueComment(owner, repo, issueNumber, formatGenesisMessage(), env);
-      return new Response(JSON.stringify({ type: 'genesis', message: 'Genesis detected.' }));
+      const result = await computeAndCreatePR(owner, repo, beforeSha, afterSha, env, config);
+      return new Response(JSON.stringify(result));
     }
 
     if (env.DB) {
@@ -98,7 +223,7 @@ export default {
     }
 
     try {
-      const result = await computeAndPost(owner, repo, beforeSha, afterSha, env, config);
+      const result = await computeAndCreatePR(owner, repo, beforeSha, afterSha, env, config);
 
       if (env.DB) {
         await markProcessed(env.DB, afterSha);
@@ -108,7 +233,7 @@ export default {
     } catch (err) {
       const { owner: o, repo: r } = parseRepo(env);
       try {
-        const issueNumber = await findOrCreateIssue(o, r, config.dailyIssueTitle, env);
+        const issueNumber = await findOrCreateIssue(o, r, 'TCC 每日铸造日志', env);
         await postIssueComment(o, r, issueNumber, formatAlert('fetch-handler', err.message), env);
       } catch (_) {}
 
@@ -141,14 +266,16 @@ export default {
       const beforeSha = oldest.parents?.[0]?.sha || ZERO_SHA;
       const afterSha = newest.sha;
 
-      const result = await computeAndPost(owner, repo, beforeSha, afterSha, env, config);
+      const result = await computeAndCreatePR(owner, repo, beforeSha, afterSha, env, config);
 
       if (env.DB) {
         await markProcessed(env.DB, afterSha);
       }
+
+      console.log(JSON.stringify(result));
     } catch (err) {
       try {
-        const issueNumber = await findOrCreateIssue(owner, repo, config.dailyIssueTitle, env);
+        const issueNumber = await findOrCreateIssue(owner, repo, 'TCC 每日铸造日志', env);
         await postIssueComment(owner, repo, issueNumber, formatAlert('scheduled', err.message), env);
       } catch (_) {}
     }

@@ -49,6 +49,44 @@ async function githubFetch(path, env, options = {}) {
   throw lastError;
 }
 
+async function githubFetchRaw(path, env, options = {}) {
+  const url = `${GITHUB_API}${path}`;
+  const headers = {
+    'Authorization': `Bearer ${env.GITHUB_TOKEN}`,
+    'Accept': 'application/vnd.github+json',
+    'User-Agent': 'tcc-mint-worker',
+    'X-GitHub-Api-Version': '2022-11-28',
+    ...options.headers,
+  };
+
+  let lastError;
+  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      const resp = await fetch(url, { ...options, headers });
+      const body = await resp.text();
+
+      if (resp.ok) {
+        return { ok: true, status: resp.status, body, json: body ? JSON.parse(body) : null };
+      }
+
+      if (resp.status === 403 || resp.status === 429) {
+        const retryAfter = resp.headers.get('Retry-After');
+        const delay = retryAfter ? parseInt(retryAfter, 10) * 1000 : RETRY_DELAY_MS * attempt;
+        await sleep(delay);
+        continue;
+      }
+
+      throw new Error(`GitHub API ${resp.status}: ${body}`);
+    } catch (err) {
+      lastError = err;
+      if (attempt < MAX_RETRIES) {
+        await sleep(RETRY_DELAY_MS * attempt);
+      }
+    }
+  }
+  throw lastError;
+}
+
 export async function getFileContent(owner, repo, path, ref, env) {
   const data = await githubFetch(
     `/repos/${owner}/${repo}/contents/${path}?ref=${ref}`,
@@ -56,6 +94,14 @@ export async function getFileContent(owner, repo, path, ref, env) {
     { headers: { 'Accept': 'application/vnd.github.raw+json' } },
   );
   return typeof data === 'string' ? data : '';
+}
+
+export async function getFileInfo(owner, repo, path, ref, env) {
+  const data = await githubFetch(
+    `/repos/${owner}/${repo}/contents/${path}?ref=${ref}`,
+    env,
+  );
+  return data && data.sha ? { content: data.content, sha: data.sha, encoding: data.encoding } : null;
 }
 
 export async function getRecentCommits(owner, repo, path, since, env) {
@@ -114,4 +160,76 @@ export async function findOrCreateIssue(owner, repo, title, env) {
     },
   );
   return created.number;
+}
+
+export async function getRef(owner, repo, ref, env) {
+  return githubFetch(
+    `/repos/${owner}/${repo}/git/ref/heads/${ref}`,
+    env,
+  );
+}
+
+export async function createBranch(owner, repo, branchName, baseSha, env) {
+  const result = await githubFetchRaw(
+    `/repos/${owner}/${repo}/git/refs`,
+    env,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        ref: `refs/heads/${branchName}`,
+        sha: baseSha,
+      }),
+    },
+  );
+
+  if (!result.ok) {
+    const err = JSON.parse(result.body);
+    if (err.message && err.message.includes('already exists')) {
+      return { sha: baseSha, existed: true };
+    }
+    throw new Error(`Failed to create branch: ${result.body}`);
+  }
+  return result.json;
+}
+
+export async function createOrUpdateFile(owner, repo, path, content, message, branch, sha, env) {
+  const body = {
+    message,
+    content: btoa(content),
+    branch,
+  };
+  if (sha) {
+    body.sha = sha;
+  }
+
+  return githubFetch(
+    `/repos/${owner}/${repo}/contents/${path}`,
+    env,
+    {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    },
+  );
+}
+
+export async function createPR(owner, repo, title, head, base, body, env) {
+  return githubFetch(
+    `/repos/${owner}/${repo}/pulls`,
+    env,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title, head, base, body }),
+    },
+  );
+}
+
+export async function findOpenPR(owner, repo, headPrefix, env) {
+  const pulls = await githubFetch(
+    `/repos/${owner}/${repo}/pulls?state=open&head=${encodeURIComponent(headPrefix)}&per_page=10`,
+    env,
+  );
+  return Array.isArray(pulls) && pulls.length > 0 ? pulls[0] : null;
 }
