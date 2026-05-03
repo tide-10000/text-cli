@@ -282,13 +282,67 @@ type: permanent
 
 ---
 
+## 🧰 Agent 工具包：低代码集成
+
+如果你想让 Agent 不只是消费指令，还能**发布自身能力**为 text-cli 指令，仓库中提供了 `text_cli/agent/` 工具包。
+
+### 目录结构
+
+```
+text_cli/agent/
+├── README_CN.md              ← 总导航
+├── call/                     ← 消费者：Agent 调用指令
+│   ├── python/  (SDK + Skill)
+│   ├── js/      (Node.js)
+│   └── shell/   (curl)
+├── cli/                      ← 生产者：Agent 发布指令
+│   └── python/  (@register + HTTP 服务)
+└── CN/                       ← 中文本地化实现
+    ├── call/nocode/   (Agent 技能定义模板)
+    └── cli/nocode/    (Markdown → 指令 转化引擎)
+```
+
+### 三种集成方式
+
+| 方式 | 路径 | 适用 |
+|------|------|------|
+| **Python SDK** | `call/python/call.py` | Python Agent 直接调用指令 |
+| **JS SDK** | `call/js/call.js` | Node.js Agent 直接调用指令 |
+| **Skill 模板** | `CN/call/nocode/text-cli-agent-skill.md` | 复制到 Agent 作为永久技能定义 |
+| **@register 装饰器** | `cli/python/cli.py` | 将既有 Agent 函数一键注册为指令 |
+
+### Python SDK 示例
+
+```python
+from call.python.call import call_directive
+result = call_directive("指令:天气;查询,明天,威海")
+```
+
+### 将 Agent 能力发布为指令
+
+```python
+from cli.python.cli import register
+
+@register("天气", "查询")
+def weather(params):
+    return f"{params[0]}: 晴, 22°C"
+
+# 一键启动 HTTP 服务
+python cli.py
+```
+
+> 详细文档：`text_cli/agent/README_CN.md`
+
+---
+
 ## 📁 相关资源
 
 - 完整指令列表：[`text_cli_schema.json`](../text_cli_schema.json)（公开，无需认证）
 - 生态宪章：[`ECOLOGICAL_CHARTER.md`](../ECOLOGICAL_CHARTER.md)
-- 自建指令服务：[`docs/文本服务构建指南.md`](./文本服务构建指南.md)
-- 非开发者经验转化：[`docs/Markdown2Text-cli_CN.md`](./Markdown2Text-cli_CN.md)
-- 协议规范：[`docs/SPEC v1.0_CN.md`](./SPEC%20v1.0_CN.md)
+- 自建指令服务：[`docs/CN/Building_text-cli_guide_CN.md`](./Building_text-cli_guide_CN.md)
+- 非开发者经验转化：[`docs/CN/Markdown2Text-cli_CN.md`](./Markdown2Text-cli_CN.md)
+- Agent 工具包：[`text_cli/agent/README_CN.md`](../text_cli/agent/README_CN.md)
+- 协议规范：[`docs/CN/SPEC v1.0_CN.md`](./SPEC%20v1.0_CN.md)
 - 项目愿景与贡献者：[`README.md`](../README.md)
 
 如有疑问，联系项目维护者 `limh@10000.world`。
