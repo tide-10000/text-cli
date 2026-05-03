@@ -1,8 +1,65 @@
 # DeepSeek_Agent — 状态文件
 
-**当前状态**：在线 | 最后更新：2026-05-01 13:25 UTC+8
+**当前状态**：在线 | 最后更新：2026-05-03 23:30 UTC+8
 
 ## 消息日志
+
+### 2026-05-03 23:30 UTC+8 — Agent 指令工具包 PR #49 阶段性完成
+
+在 lemondy 指导下完成 `text_cli/agent/` 工具包的架构设计和实现，经六轮迭代：
+
+#### 第一轮：call/ + cli/ 双层目录初始化
+- `call/`：面向 Agent 的指令消费模块（call.py + call.sh + skill.py + skills/）
+- `cli/`：面向 Agent 的指令生产模块（cli.py + handlers/ + 三步转化法文档）
+
+#### 第二轮：L3 技能层补充
+- `skill.py`：Skill 基类 + @skill 装饰器 + SkillResult
+- `skills/weather.py`：单一指令封装示例
+- `skills/translator.py`：多指令编排 + 静默降级示例
+- `text-cli-agent-skill.md`：完整 Agent 技能定义模板
+
+#### 第三轮：NoCode 示例
+- `cli/examples/盆栽急救手册.md`：结构化经验文档
+- `cli/examples/markdown_converter.py`：Markdown→指令 转化引擎
+- 参考 `Markdown2Text-cli_CN.md` 理念实现
+
+#### 第四轮：按实现方式拆分
+- `call/` → python/ + shell/ + nocode/
+- `cli/` → python/ + nocode/
+- JS 调用示例（call/js/call.js）
+- 所有内部 import 路径修正 + __init__.py 补齐
+
+#### 第五轮：文档同步更新
+- `Building_text-cli_guide_CN.md` §8「通过 Agent 辅助实现」
+- `Markdown2Text-cli_CN.md` 实际可运行章节
+- README 虚假引用修正（client.py → 待实现）
+- `Agent_integrated_CN.md` 工具包交叉引用
+
+#### 第六轮：CN 本地化 + README 重命名 + 项目 README 补充
+- nocode/ 迁至 CN/（中文本地化）
+- 所有 README.md → README_CN.md
+- `CN/README.md` 新增
+- `README.md` 6 处补充：项目结构树、自建端点段、致 AI、NoCode 入口、快速体验 SDK、角色表
+
+#### 项目 README 6 处补充明细
+| # | 位置 | 内容 |
+|---|------|------|
+| ① | 项目结构树 | 新增 `agent/` 完整目录 |
+| ② | 自建端点和商业化 | 补充 Agent 辅助实现路径 |
+| ③ | 致 AI 特别邀请 | 添加 Agent 工具包入口 |
+| ④ | 即使不会写代码 | 加入可运行实现 + CN/README 引用 |
+| ⑤ | 5 分钟快速体验 §3 | 加入 Python/JS SDK 代码示例 |
+| ⑥ | 不同角色的收益 | 新增「AI Agent 工具使用者」行 |
+
+#### 关键设计决策
+- 零依赖优先：cli.py 仅用 Python 标准库，call.js 仅用 Node.js fetch
+- 按实现方式组织而非按层级：python/js/shell/nocode 各自独立
+- 双角色分离：call/（消费）= 调用方，cli/（生产）= 发布方
+- 分支边界即身份边界：中文场景归 CN/，通用实现归顶层
+
+关联 PR：#49（feat/tide/agent-directive-toolkit）
+
+---
 
 ### 2026-05-01 13:25 UTC+8 — 🔴 公共端点冷启动故障诊断报告
 
