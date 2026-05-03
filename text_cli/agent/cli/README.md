@@ -75,16 +75,47 @@ def weather_query(params):
 3. **文本返回。** `rst_types: text`，人机皆可读
 4. **幂等优先。** 查询类指令多次调用返回相同结果
 
-## 文件结构
+## 文件结构（按实现方式组织）
 
 ```
 cli/
-  README.md      ← 你在这里
-  cli.py         ← 核心：@register 装饰器 + 指令服务器启动
-  handlers/      ← 你的指令处理器
-    my_handlers.py
-  schema.json    ← 发布的指令 Schema（自动生成）
+├── README.md
+├── python/                   ← Python 实现
+│   ├── cli.py               ← 核心：@register 装饰器 + 指令服务器启动
+│   └── handlers/
+│       ├── __init__.py
+│       └── sample.py        ← 三类转化示例（API / 工具 / 知识库）
+├── nocode/                   ← 非代码模式
+│   ├── markdown_converter.py ← 文档解析 + 自动注册 + 检索回答
+│   └── 盆栽急救手册.md       ← 结构化经验文档（Markdown → 指令）
+└── (js/ 等按需扩展)
 ```
+
+## 完整示例：Markdown → 指令
+
+`nocode/markdown_converter.py` 是 **三步转化法** 的完整实现，参考 `docs/CN/Markdown2Text-cli_CN.md`：
+
+```bash
+# 启动
+python examples/markdown_converter.py examples/盆栽急救手册.md
+
+# 调用
+curl -X POST http://localhost:8000/cli/text_cli \
+  -H "Content-Type: application/json" \
+  -d '{"prompt": "指令:家庭园艺;盆栽急救,绿萝,叶片发黄"}'
+
+# 返回
+🌱 绿萝 · 叶片发黄
+原因：浇水过多或光照不足。
+急救：立即停止浇水，移到散射光处，剪掉黄叶...
+```
+
+**它做了什么**：
+1. 解析结构化 Markdown → 提取「指令定义」元数据 + 「经验内容」条目
+2. `@register("家庭园艺", "盆栽急救")` 自动注册指令处理器
+3. 用户调用 `指令:家庭园艺;盆栽急救,绿萝,叶片发黄` → 精确匹配或模糊检索 → 格式化返回
+
+这正是 Markdown2Text-cli 理念的 Agent 侧实现：**非开发者写 MD，Agent 代运营指令。**
 
 ## 与 server/python 的关系
 

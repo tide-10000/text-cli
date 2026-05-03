@@ -194,7 +194,7 @@ def main():
                 continue
             module_name = f.stem
             try:
-                __import__(f"handlers.{module_name}")
+                __import__(f"cli.python.handlers.{module_name}")
                 logger.info("已加载处理器: handlers/%s", f.name)
             except Exception as e:
                 logger.warning("加载失败 %s: %s", f.name, e)

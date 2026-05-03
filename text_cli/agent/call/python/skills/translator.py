@@ -5,8 +5,8 @@ skills/translator.py — 示例：翻译技能（多指令编排）
 这是"复合技能"的参考实现。
 """
 
-from call.skill import Skill, skill, SkillResult
-from call.call import call_directive
+from call.python.skill import Skill, skill, SkillResult
+from call.python.call import call_directive
 
 
 @skill("智能翻译", domain="翻译", action="翻译")

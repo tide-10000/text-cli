@@ -10,7 +10,7 @@ sample.py — 示例：将 Agent 既有能力转化为 text-cli 指令
     def query_weather(params): ...
 """
 
-from cli import register
+from cli.python.cli import register
 
 
 # ─── 示例 1: 既有 API → 指令 ────────────────────────

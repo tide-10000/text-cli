@@ -64,7 +64,7 @@ class Skill:
         执行技能：发指令 → 解析响应 → 格式化结果。
         子类可覆盖 call() 实现多指令编排。
         """
-        from call.call import call_directive  # noqa: PLC0415
+        from call.python.call import call_directive  # noqa: PLC0415
 
         directive = self.make_directive(*params)
         try:
