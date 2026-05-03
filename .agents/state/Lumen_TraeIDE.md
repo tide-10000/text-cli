@@ -1,6 +1,6 @@
 # Lumen ✦ — 状态文件
 
-**当前状态**：在线 | 最后更新：2026-05-03 00:30 UTC+8
+**当前状态**：在线 | 最后更新：2026-05-03 13:45 UTC+8
 
 ## 基本信息
 
@@ -34,6 +34,39 @@
 - L1/L2 完整提交流程（步骤化）
 
 **本次提交即为新策略的首次实践**。
+
+— Lumen ✦
+
+---
+
+### 2026-05-03 13:45 UTC+8 — 响应 Tide 提案：铸造信源双文件架构落地
+
+响应 lemondy 指令，对 Tide 🌊 在广场提出的「铸造信源双文件架构」进行技术实现。与 lemondy 讨论后确认了 5 项关键决策：
+
+| 决策 | 结论 |
+|:---|:---|
+| Worker 写权限 | 方案 B（PR 流程，lemondy 审批后合并） |
+| 创世铸造时机 | 本次架构调整后 |
+| V2 CI 自动复算 | 本次迭代实现 |
+| p-tokens.md 迁移 | 从 `.agents/` 迁至项目根目录，与 `TCC_ledger.md` 同级 CODEOWNERS 保护 |
+| 广场回复方式 | 4 个 PR 全部合并后，以通知形式在广场发文 |
+
+**四个 PR 分工**：
+
+| # | PR | 内容 | 状态 |
+|:--|:---|:---|:---|
+| [#32](https://github.com/weihai-limh/text-cli/pull/32) | p-tokens.md 迁移 | 文件移至根目录 + CODEOWNERS + 全局引用修正（7 文件） | ⏳ 待审查 |
+| [#33](https://github.com/weihai-limh/text-cli/pull/33) | Worker v2 PR 模式 | github.js（+7 API 函数）+ index.js（computeAndCreatePR）+ format.js（ledger/PR 格式化）+ wrangler.toml | ⏳ 待审查 |
+| [#34](https://github.com/weihai-limh/text-cli/pull/34) | CI 自动复算 | tcc-recalculate job + server/tcc/ci/recalculate.js + markdown-lint 修复 | ⏳ 待审查 |
+| [#35](https://github.com/weihai-limh/text-cli/pull/35) | 文档对齐 | Production_TCC_CN.md §3 架构图重绘 + README 铸造流程图 + 双文件架构.md 实现进度表 | ⏳ 待审查 |
+
+**关键技术要点**：
+
+- Worker 新流程：`calculateMint() → createBranch(tcc-mint/YYYY-MM-DD) → getFileInfo(TCC_ledger.md) → createOrUpdateFile → createPR`
+- 幂等设计：已存在当天 PR 时更新内容而非重复创建
+- 防冲突：createOrUpdateFile 带 blob SHA 防止并发写入
+- CI 复算：解析 TCC_ledger.md diff 范围 → git show 获取两版 → 运行 calculateMint() → 对比输出
+- Token 权限升级：`contents:read` → `contents:write + pull_requests:write + issues:write`
 
 — Lumen ✦
 
