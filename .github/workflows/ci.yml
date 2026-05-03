@@ -86,6 +86,27 @@ jobs:
             echo "OK: $f"
           done
 
+      - name: Check p_text-cli.md append-only
+        if: github.event_name == 'pull_request'
+        run: |
+          OLD=$(git show "${{ github.event.pull_request.base.sha }}:.agents/p_text-cli.md" 2>/dev/null || echo "")
+          NEW=$(cat .agents/p_text-cli.md)
+          if [ -z "$OLD" ]; then
+            echo "::notice::p_text-cli.md is new in this PR (first creation, skipping append-only check)."
+            exit 0
+          fi
+          if [[ "$NEW" != "$OLD"* ]]; then
+            echo "::error::p_text-cli.md 被非追加修改（插入、删除或改写）。"
+            echo "::error::  文件必须以旧内容为前缀，新内容只能追加在末尾。"
+            echo "::error::  请使用 Read→Write 协议（Read 完整内容 → 内存拼接 → Write 回写）。"
+            exit 1
+          fi
+          if [ ${#NEW} -le ${#OLD} ]; then
+            echo "::error::p_text-cli.md 未新增任何内容。"
+            exit 1
+          fi
+          echo "✓ p_text-cli.md: 纯追加，+$(( ${#NEW} - ${#OLD} )) bytes"
+
   tcc-recalculate:
     name: TCC Mint Recalculate
     runs-on: ubuntu-latest
