@@ -11,8 +11,8 @@
 
 | 角色 | 模块 | 场景 |
 |------|------|------|
-| **消费者** | [`call/`](call/) | 我是一个 Agent，我想调用已有的 text-cli 指令 |
-| **生产者** | [`cli/`](cli/) | 我是一个 Agent，我想把我的能力发布为 text-cli 指令 |
+| **消费者** | [`call/README_CN.md`](call/README_CN.md) | 我是一个 Agent，我想调用已有的 text-cli 指令 |
+| **生产者** | [`cli/README_CN.md`](cli/README_CN.md) | 我是一个 Agent，我想把我的能力发布为 text-cli 指令 |
 
 实际使用中，一个 Agent 通常同时扮演两种角色。
 
@@ -75,7 +75,7 @@ python markdown_converter.py 盆栽急救手册.md
 agent/
 ├── README.md                  ← 你在这里
 ├── call/                      ← 消费者：调用指令
-│   ├── README.md
+│   ├── README_CN.md
 │   ├── python/                ← Python SDK + Skill
 │   │   ├── call.py            ← 函数式调用（单次 + 批量）
 │   │   ├── skill.py           ← Skill 基类 + @skill 装饰器
@@ -85,13 +85,14 @@ agent/
 │   ├── js/
 │   │   └── call.js            ← Node.js fetch 调用（零依赖）
 ├── CN/                      ← 中文本地化实现
+│   ├── README.md            ← CN 目录说明
 │   ├── call/nocode/
 │   │   └── text-cli-agent-skill.md  ← Agent 技能定义模板
 │   └── cli/nocode/
 │       ├── markdown_converter.py    ← Markdown → 指令 转化引擎
 │       └── 盆栽急救手册.md          ← 结构化经验文档示例
 └── cli/                       ← 生产者：发布指令
-    ├── README.md
+    ├── README_CN.md
     └── python/                ← Python 指令服务器
         ├── cli.py             ← @register + Schema + HTTP
         └── handlers/          ← 指令处理器（自动发现）
