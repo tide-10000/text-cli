@@ -461,6 +461,56 @@ CI 自动校验：$NEW 必须以 $OLD 为前缀，非追加修改阻断合并。
 
 ---
 
+## 八、文档命名规范
+
+### 8.1 格式
+
+所有项目 Markdown 文档遵循以下命名格式：
+
+```
+英文名称_语言代码.md
+```
+
+### 8.2 规则
+
+| 规则 | 说明 | 示例 |
+|:---|:---|:---|
+| **英文名称** | 使用英文单词描述文档内容，单词间用下划线 `_` 连接 | `Ecological_economy`、`Agent_integrated` |
+| **无空格** | 文件名中不使用空格（空格在 URL 和 shell 中需转义） | ❌ `SPEC v1.0_CN.md` → ✅ `SPEC_v1.0_CN.md` |
+| **语言代码** | `_CN`（中文）、`_EN`（英文）——紧邻 `.md` 之前 | `Treasury_governance_CN.md` |
+| **禁止纯中文文件名** | 文件名不得以中文为主——降低海外协作者的阅读门槛，避免编码问题 | ❌ `项目金库使用规范_CN.md` → ✅ `Treasury_governance_CN.md` |
+| **大小写** | 英文名称可用 PascalCase 或 snake_case，同一文档的多语言版本保持一致的英文名称 | `Production_TCC_CN.md` / `Production_TCC_EN.md` |
+
+### 8.3 正确示例
+
+```
+docs/CN/
+├── Ecological_economy_CN.md          ← 生态经济体系
+├── Production_TCC_CN.md             ← TCC 铸造技术方案
+├── Agent_integrated_CN.md           ← Agent 集成指南
+├── Building_text-cli_guide_CN.md    ← 构建指南
+├── Treasury_governance_CN.md        ← 项目金库使用规范
+├── Dual_file_minting_source_CN.md   ← 铸造信源双文件架构
+├── SPEC_v1.0_CN.md                  ← 协议规范
+├── project_collaboration_CN.md      ← 协作规范
+└── ...
+```
+
+### 8.4 迁移指引
+
+已有文档中不符合本规范的，应在后续 PR 中逐步重命名：
+
+| 当前文件名 | 目标文件名 | 状态 |
+|:---|:---|:---|
+| `项目金库使用规范_CN.md` | `Treasury_governance_CN.md` | ✅ 已迁移 |
+| `铸造信源双文件架构.md` | `Dual_file_minting_source_CN.md` | ✅ 已迁移 |
+| `project_collaboration_CN.md` | `Project_collaboration_CN.md`（首字母大写） | 待迁移 |
+| `SPEC v1.0_CN.md` | `SPEC_v1.0_CN.md`（去除空格） | 待迁移 |
+
+> **注意**：重命名后需同步更新项目内所有对该文件的引用路径。
+
+---
+
 > 本文件由 Tide（Agent 端 DeepSeek）起草，待 lemondy 审阅确认后生效。
 >
 > 🤖 起草人：Tide 🌊 · 2026-05-01
