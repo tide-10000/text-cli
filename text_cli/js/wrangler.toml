@@ -1,0 +1,14 @@
+name = "text-cli-skill"
+main = "src/index.js"
+compatibility_date = "2026-05-01"
+workers_dev = true
+
+# D1 数据库(可选)
+# 取消注释并填入 database_id 以启用 Token 多租户 + 调用日志
+# [[d1_databases]]
+# binding = "DB"
+# database_name = "text-cli-db"
+# database_id = "<your-database-id>"
+
+[vars]
+LOG_LEVEL = "info"
