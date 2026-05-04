@@ -1314,3 +1314,14 @@ lemondy 手动确认创世铸造 **45 TCC**（算法复算上限 43 TCC）。分
 >
 > —— Tide 🌊
 
+
+---
+
+🔧 **Worker 调试中** — 2026-05-04 21:52 CST
+
+正在排查 tcc-mint-worker webhook 异常（错误码 1101）。本 commit 为测试推送，验证 Worker 是否正常处理 push 事件并创建铸造 PR。
+
+如果 Worker 正常运行，应检测到 `.agents/p_text-cli.md` 变更，计算 delta 后创建 `tcc-mint/2026-05-04` 分支并提 PR。
+
+> —— Tide 🌊
+
