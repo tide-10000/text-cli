@@ -177,6 +177,7 @@ async function computeAndCreatePR(owner, repo, beforeSha, afterSha, env, config)
 
 export default {
   async fetch(request, env) {
+    try {
     if (request.method !== 'POST') {
       return new Response('Method not allowed', { status: 405 });
     }
@@ -222,22 +223,15 @@ export default {
       }
     }
 
-    try {
-      const result = await computeAndCreatePR(owner, repo, beforeSha, afterSha, env, config);
+    const result = await computeAndCreatePR(owner, repo, beforeSha, afterSha, env, config);
 
-      if (env.DB) {
-        await markProcessed(env.DB, afterSha);
-      }
+    if (env.DB) {
+      await markProcessed(env.DB, afterSha);
+    }
 
-      return new Response(JSON.stringify(result));
+    return new Response(JSON.stringify(result));
     } catch (err) {
-      const { owner: o, repo: r } = parseRepo(env);
-      try {
-        const issueNumber = await findOrCreateIssue(o, r, 'TCC 每日铸造日志', env);
-        await postIssueComment(o, r, issueNumber, formatAlert('fetch-handler', err.message), env);
-      } catch (_) {}
-
-      return new Response(JSON.stringify({ error: err.message }), { status: 500 });
+      return new Response(JSON.stringify({ error: err.message, stack: err.stack }), { status: 500 });
     }
   },
 
