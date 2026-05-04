@@ -1032,3 +1032,599 @@ export TEXT_CLI_TOKEN="your-token"
 两种路径生成的服务完全兼容——调用方无需关心指令是由 `server/python` 还是 `agent/cli` 提供的。
 
 ---
+
+## 9. Cloudflare Workers + D1 全云部署（Node.js）
+
+> 本章将 §2.1 的 Express 示例重构为 **Cloudflare Workers + D1** 架构,实现零服务器、全球边缘部署。无需 Docker、无需虚拟机,`wrangler deploy` 一次即可上线。
+
+### 9.1 架构总览
+
+```
+Cloudflare Edge (全球 300+ 节点)
+│
+├── Worker (指令服务入口)
+│   ├── POST /cli/text_cli           → 解析指令 + 分发 handler + 记录日志
+│   ├── GET  /health                 → 健康检查 + 已注册指令列表
+│   └── GET  /text_cli_schema.json   → Agent 发现端点(从 D1/KV 读取)
+│
+├── D1 Database (SQLite at edge)
+│   ├── directives 表                → 指令元数据 + Schema 定义
+│   ├── tokens 表                    → 多租户 Service Token 管理 + 配额
+│   └── usage_logs 表                → 调用日志 + 计费依据
+│
+└── KV Namespace (可选)
+    └── schema-cache                 → Schema 缓存,减少 D1 查询延迟
+```
+
+**与 Express 版的对应关系**:
+
+| Express (§2.1) | Cloudflare Workers | 说明 |
+|:---|:---|:---|
+| `express()` | `export default { fetch }` | Workers 原生 fetch 事件处理器 |
+| `app.post('/cli/text_cli', handler)` | URL 路由匹配 | 手动路由或轻量路由库 |
+| 内存中的路由表 | D1 `directives` 表 | 指令元数据持久化 |
+| 环境变量 `SERVICE_TOKEN` | D1 `tokens` 表 + Workers Secrets | 多 Token + 配额管理 |
+| `console.log` | D1 `usage_logs` 表 | 结构化日志,可查询 |
+| Docker 部署 | `wrangler deploy` | 一条命令部署到全球边缘 |
+
+### 9.2 项目结构
+
+```text_cli/js/
+├── src/
+│   ├── index.js              # Worker 入口(fetch 事件处理器 + 路由)
+│   ├── parser.js             # 指令解析器(正则匹配,与 Python 版逻辑一致)
+│   ├── registry.js           # 指令注册表(启动时从代码注册)
+│   ├── auth.js               # Token 鉴权(D1 可选)
+│   ├── schema.js             # Schema 管理(D1 可选,回退静态文件)
+│   └── handlers/
+│       ├── index.js           # 自动聚合所有 handler
+│       └── sample.js          # 示例指令 handler
+├── schema/
+│   └── text_cli_schema.json   # 静态 Schema 源文件
+├── migrations/
+│   └── 0001_init.sql          # D1 数据库迁移脚本(仅 D1 模式使用)
+├── test/
+│   ├── parser.test.js
+│   ├── registry.test.js
+│   └── integration.test.js
+├── wrangler.toml              # Cloudflare Workers 配置
+├── package.json
+└── vitest.config.js
+```
+
+### 9.3 D1 数据库设计
+
+**migrations/0001_init.sql**
+
+```sql
+-- 指令注册表:存储所有指令的元数据
+CREATE TABLE IF NOT EXISTS directives (
+  id TEXT PRIMARY KEY,
+  domain TEXT NOT NULL,
+  action TEXT NOT NULL,
+  name TEXT NOT NULL,
+  category TEXT,
+  description TEXT,
+  parameters_json TEXT DEFAULT '[]',
+  prompt_template TEXT,
+  trigger_keywords_json TEXT DEFAULT '[]',
+  response_type TEXT DEFAULT 'text',
+  response_example_json TEXT,
+  handler_type TEXT DEFAULT 'static',
+  enabled INTEGER DEFAULT 1,
+  created_at TEXT DEFAULT (datetime('now')),
+  updated_at TEXT DEFAULT (datetime('now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_directives_domain_action
+  ON directives(domain, action);
+
+-- Service Token 管理:支持多租户 + 配额
+CREATE TABLE IF NOT EXISTS tokens (
+  token_hash TEXT PRIMARY KEY,
+  client_name TEXT NOT NULL,
+  quota INTEGER DEFAULT -1,
+  used INTEGER DEFAULT 0,
+  enabled INTEGER DEFAULT 1,
+  created_at TEXT DEFAULT (datetime('now'))
+);
+
+-- 调用日志:计费与审计
+CREATE TABLE IF NOT EXISTS usage_logs (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  request_id TEXT,
+  directive_key TEXT NOT NULL,
+  token_hash TEXT,
+  params_json TEXT,
+  result_status TEXT,
+  response_time_ms INTEGER,
+  created_at TEXT DEFAULT (datetime('now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_usage_logs_created
+  ON usage_logs(created_at);
+
+CREATE INDEX IF NOT EXISTS idx_usage_logs_directive
+  ON usage_logs(directive_key, created_at);
+```
+
+**初始化 D1 并导入 Schema**:
+
+```bash
+cd text_cli/js
+
+# 创建 D1 数据库
+wrangler d1 create text-cli-db
+# 输出: ✅ Created database 'text-cli-db' with ID <uuid>
+# 将 database_id 填入 wrangler.toml
+
+# 执行迁移
+wrangler d1 execute text-cli-db --file=migrations/0001_init.sql
+
+# 导入静态 Schema 到 directives 表
+node scripts/seed-directives.js
+```
+
+### 9.4 核心代码
+
+#### 9.4.1 指令解析器 `src/parser.js`
+
+与 Python 版逻辑完全一致,正则匹配 `指令:领域;动作,参数`:
+
+```javascript
+const DIRECTIVE_PATTERN = /^\s*指令[：:]([^;]+);([^,]+)(?:,(.+))?\s*$/;
+const MAX_DIRECTIVE_LENGTH = 512;
+const MAX_PARAMS = 20;
+
+export class DirectiveParseError extends Error {
+  constructor(message, code = 'INVALID_DIRECTIVE_FORMAT') {
+    super(message);
+    this.code = code;
+  }
+}
+
+export function parseDirective(prompt) {
+  if (!prompt || !prompt.trim()) {
+    throw new DirectiveParseError('prompt is required');
+  }
+
+  prompt = prompt.trim();
+
+  if (prompt.length > MAX_DIRECTIVE_LENGTH) {
+    throw new DirectiveParseError(
+      `directive exceeds max length (${MAX_DIRECTIVE_LENGTH})`
+    );
+  }
+
+  const match = DIRECTIVE_PATTERN.exec(prompt);
+  if (!match) {
+    throw new DirectiveParseError(`invalid directive format: ${prompt}`);
+  }
+
+  const domain = match[1].trim();
+  const action = match[2].trim();
+  const rawParams = match[3];
+
+  const params = [];
+  if (rawParams) {
+    for (const p of rawParams.split(',')) {
+      const trimmed = p.trim();
+      if (trimmed) params.push(trimmed);
+    }
+  }
+
+  if (params.length > MAX_PARAMS) {
+    throw new DirectiveParseError(
+      `too many parameters (${params.length}), max ${MAX_PARAMS}`
+    );
+  }
+
+  if (!domain) throw new DirectiveParseError('domain is empty');
+  if (!action) throw new DirectiveParseError('action is empty');
+
+  return {
+    domain,
+    action,
+    params,
+    raw: prompt,
+    directiveKey: `指令:${domain};${action}`,
+  };
+}
+```
+
+#### 9.4.2 指令注册表 `src/registry.js`
+
+代码中的 handler 通过 `registerHandler` 注册:
+
+```javascript
+const _registry = new Map();
+
+export function registerHandler(domain, action, handler) {
+  const key = `${domain};${action}`;
+  _registry.set(key, handler);
+}
+
+export function dispatch(domain, action, params) {
+  const key = `${domain};${action}`;
+  const handler = _registry.get(key);
+  if (!handler) {
+    return `未找到匹配的指令: ${domain};${action}`;
+  }
+  return handler(params);
+}
+
+export function getRegisteredDirectives() {
+  const result = {};
+  for (const [key] of _registry) {
+    const sepIdx = key.indexOf(';');
+    const domain = key.slice(0, sepIdx);
+    const action = key.slice(sepIdx + 1);
+    if (!result[domain]) result[domain] = [];
+    result[domain].push(action);
+  }
+  return result;
+}
+
+export function getRegistrySize() {
+  return _registry.size;
+}
+
+export function clearRegistry() {
+  _registry.clear();
+}
+```
+
+#### 9.4.3 Token 鉴权 `src/auth.js`
+
+支持两种模式:**D1 多 Token 模式**(有数据库时)和**单 Token 模式**(无数据库时回退到环境变量):
+
+```javascript
+const SERVICE_TOKEN = globalThis.SERVICE_TOKEN || '';
+
+async function sha256Hex(text) {
+  const data = new TextEncoder().encode(text);
+  const hash = await crypto.subtle.digest('SHA-256', data);
+  return [...new Uint8Array(hash)].map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+export async function verifyServiceToken(token, db) {
+  if (!token) {
+    return { allowed: false, clientName: '', message: 'Service-token 缺失' };
+  }
+
+  const clean = token.trim();
+
+  if (db) {
+    const hash = await sha256Hex(clean);
+    const row = await db
+      .prepare(
+        'SELECT client_name, quota, used, enabled FROM tokens WHERE token_hash = ?'
+      )
+      .bind(hash)
+      .first();
+
+    if (!row) {
+      return { allowed: false, clientName: '', message: 'Service-token 无效' };
+    }
+    if (!row.enabled) {
+      return { allowed: false, clientName: row.client_name, message: 'Token 已禁用' };
+    }
+    if (row.quota >= 0 && row.used >= row.quota) {
+      return {
+        allowed: false,
+        clientName: row.client_name,
+        message: `配额已用尽 (${row.used}/${row.quota})`,
+      };
+    }
+    return { allowed: true, clientName: row.client_name, message: '', tokenHash: hash };
+  }
+
+  if (!SERVICE_TOKEN) {
+    return { allowed: true, clientName: 'anonymous', message: '' };
+  }
+  if (clean !== SERVICE_TOKEN) {
+    return { allowed: false, clientName: '', message: 'Service-token 无效' };
+  }
+  return { allowed: true, clientName: 'authenticated', message: '' };
+}
+
+export async function incrementUsage(db, tokenHash) {
+  if (!db || !tokenHash) return;
+  await db
+    .prepare('UPDATE tokens SET used = used + 1 WHERE token_hash = ?')
+    .bind(tokenHash)
+    .run();
+}
+```
+
+#### 9.4.4 示例 Handler `src/handlers/sample.js`
+
+```javascript
+import { registerHandler } from '../registry.js';
+
+registerHandler('示例领域', '回显', (params) => {
+  return params.length > 0
+    ? `回显结果: ${params.join(', ')}`
+    : '回显结果: (无参数)';
+});
+
+registerHandler('示例领域', '问候', (params) => {
+  const name = params[0] || '世界';
+  return `你好, ${name}!`;
+});
+
+registerHandler('示例领域', '列表', () => {
+  return '示例指令列表:\n- 回显: 回显参数\n- 问候: 问候指定名称\n- 列表: 显示此列表';
+});
+```
+
+#### 9.4.5 Worker 入口 `src/index.js`
+
+```javascript
+import { parseDirective, DirectiveParseError } from './parser.js';
+import { dispatch, getRegisteredDirectives } from './registry.js';
+import { verifyServiceToken, incrementUsage } from './auth.js';
+import { getSchema } from './schema.js';
+import './handlers/index.js';
+
+function json(data, status = 200) {
+  return new Response(JSON.stringify(data), {
+    status,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+function ok(text) {
+  return json({ rst_types: 'text', rst_data: { text } });
+}
+
+function errorResponse(text, status = 400) {
+  return json({ rst_types: 'text', rst_data: { text: `指令执行失败: ${text}` } }, status);
+}
+
+async function handleDirective(request, env) {
+  const serviceToken = request.headers.get('Service-token');
+  const auth = await verifyServiceToken(serviceToken, env.DB);
+
+  if (!auth.allowed) {
+    return json({ rst_types: 'text', rst_data: { text: `无权访问: ${auth.message}` } }, 403);
+  }
+
+  let body;
+  try {
+    body = await request.json();
+  } catch {
+    return errorResponse('请求体不是有效 JSON');
+  }
+
+  const prompt = body?.prompt;
+  if (!prompt) {
+    return errorResponse('缺少 prompt 字段');
+  }
+
+  let parsed;
+  try {
+    parsed = parseDirective(prompt);
+  } catch (e) {
+    if (e instanceof DirectiveParseError) {
+      return errorResponse(`${e.code}: ${e.message}`);
+    }
+    throw e;
+  }
+
+  const start = Date.now();
+  const result = dispatch(parsed.domain, parsed.action, parsed.params);
+  const elapsed = Date.now() - start;
+
+  if (env.DB) {
+    env.DB.prepare(
+      `INSERT INTO usage_logs (directive_key, token_hash, params_json, result_status, response_time_ms)
+       VALUES (?, ?, ?, ?, ?)`
+    )
+      .bind(parsed.directiveKey, auth.tokenHash || null, JSON.stringify(parsed.params), 'ok', elapsed)
+      .run()
+      .catch(() => {});
+  }
+
+  incrementUsage(env.DB, auth.tokenHash).catch(() => {});
+
+  return ok(result);
+}
+
+export default {
+  async fetch(request, env) {
+    const url = new URL(request.url);
+    const path = url.pathname;
+
+    if (request.method === 'POST' && path === '/cli/text_cli') {
+      return handleDirective(request, env);
+    }
+
+    if (request.method === 'GET' && path === '/health') {
+      return json({ status: 'ok', directives: getRegisteredDirectives() });
+    }
+
+    if (request.method === 'GET' && path === '/text_cli_schema.json') {
+      const schema = await getSchema(env.DB);
+      return json(schema);
+    }
+
+    return json({ error: 'Not Found' }, 404);
+  },
+};
+```
+
+### 9.5 Schema 管理
+
+Schema 支持两种数据源:**D1 数据库**（启用时）和**静态 JSON 文件**（回退）。通过 `scripts/seed-directives.js` 将静态 Schema 导入 D1:
+
+**`src/schema.js`**
+
+```javascript
+import staticSchema from '../schema/text_cli_schema.json';
+
+export async function getSchema(db) {
+  if (db) {
+    const rows = await db
+      .prepare(
+        `SELECT id, name, category, description, domain, action,
+                parameters_json, prompt_template, trigger_keywords_json,
+                response_type, response_example_json
+         FROM directives WHERE enabled = 1`
+      )
+      .all();
+
+    const schema = {};
+    for (const row of rows.results) {
+      schema[row.id] = {
+        id: row.id,
+        name: row.name,
+        category: row.category,
+        description: row.description,
+        directive: `指令:${row.domain};${row.action}`,
+        parameters: JSON.parse(row.parameters_json || '[]'),
+        prompt_template: row.prompt_template,
+        trigger_keywords: JSON.parse(row.trigger_keywords_json || '[]'),
+        response_type: row.response_type,
+        response_example: row.response_example_json
+          ? JSON.parse(row.response_example_json)
+          : undefined,
+      };
+    }
+
+    if (Object.keys(schema).length > 0) {
+      return schema;
+    }
+  }
+
+  return staticSchema;
+}
+```
+
+### 9.6 wrangler.toml 配置
+
+**完整模式(D1)**:
+
+```toml
+name = "text-cli-skill"
+main = "src/index.js"
+compatibility_date = "2026-05-01"
+workers_dev = true
+
+[[d1_databases]]
+binding = "DB"
+database_name = "text-cli-db"
+database_id = "<your-database-id>"
+
+[vars]
+LOG_LEVEL = "info"
+```
+
+**精简模式(纯 Workers,无 D1)**:
+
+```toml
+name = "text-cli-skill"
+main = "src/index.js"
+compatibility_date = "2026-05-01"
+workers_dev = true
+
+[vars]
+LOG_LEVEL = "info"
+```
+
+精简模式下:Token 回退到 `SERVICE_TOKEN` 环境变量,Schema 使用静态 JSON 文件,无调用日志。
+
+### 9.7 添加新指令
+
+**方式一:代码注册(推荐,适合有状态逻辑)**
+
+在 `src/handlers/` 下新建文件,调用 `registerHandler`:
+
+```javascript
+// src/handlers/weather.js
+import { registerHandler } from '../registry.js';
+
+registerHandler('基础服务', '天气查询', (params) => {
+  const city = params[1] || '威海';
+  return `${city}明天天气: 23°C, 多云`;
+});
+```
+
+然后在 `src/handlers/index.js` 中导入:
+
+```javascript
+import './sample.js';
+import './weather.js';
+```
+
+**方式二:D1 动态注册(适合简单模板)**
+
+通过管理接口将指令元数据写入 D1,handler 使用内置模板引擎:
+
+```bash
+wrangler d1 execute text-cli-db --command=\
+  "INSERT INTO directives (id, domain, action, name, handler_type)
+   VALUES ('weather_query', '基础服务', '天气查询', '天气查询', 'template')"
+```
+
+### 9.8 部署流程
+
+```bash
+cd text_cli/js
+
+# 1. 安装依赖
+npm install
+
+# 2. 本地开发(模拟 D1)
+wrangler dev
+
+# 3. 创建 D1 数据库(首次)
+wrangler d1 create text-cli-db
+
+# 4. 执行数据库迁移
+wrangler d1 execute text-cli-db --file=migrations/0001_init.sql
+
+# 5. 导入指令 Schema
+node scripts/seed-directives.js
+
+# 6. 添加 Service Token
+wrangler d1 execute text-cli-db --command=\
+  "INSERT INTO tokens (token_hash, client_name, quota)
+   VALUES ('<sha256-hash>', '测试客户端', 1000)"
+
+# 7. 部署到 Cloudflare
+wrangler deploy
+```
+
+部署完成后:
+
+```bash
+# 健康检查
+curl https://text-cli-skill.<subdomain>.workers.dev/health
+
+# 执行指令
+curl -X POST https://text-cli-skill.<subdomain>.workers.dev/cli/text_cli \
+  -H "Content-Type: application/json" \
+  -H "Service-token: your-token" \
+  -d '{"prompt":"指令:示例领域;回显,hello"}'
+
+# 获取 Schema
+curl https://text-cli-skill.<subdomain>.workers.dev/text_cli_schema.json
+```
+
+### 9.9 三种路径对比
+
+| | Express (§2.1) | FastAPI (§2.2) | **Workers (§9)** |
+|:---|:---|:---|:---|
+| **运行时** | Node.js | Python | Cloudflare Workers (V8) |
+| **数据库** | 无(内存) | 无(内存) | **D1 (可选,不配则回退静态文件)** |
+| **部署** | Docker / VM | Docker / VM | **`wrangler deploy`** |
+| **冷启动** | 秒级 | 秒级 | **< 5ms** |
+| **全球分发** | 需自建 CDN | 需自建 CDN | **内置 300+ 节点** |
+| **Token 管理** | 单 Token(环境变量) | 单 Token(环境变量) | **单 Token 或 D1 多 Token + 配额** |
+| **调用日志** | 无 | 无 | **D1 结构化日志(需 D1)** |
+| **Schema 热更新** | 需重启 | 需重启 | **D1 写入即生效(需 D1)** |
+| **费用** | 服务器费用 | 服务器费用 | **免费额度:10万次/天** |
+| **适用场景** | 本地开发 / 自建服务 | 本地开发 / 自建服务 | **全球边缘部署** |
+
+---

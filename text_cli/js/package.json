@@ -1,0 +1,20 @@
+{
+  "name": "text-cli-skill",
+  "version": "0.1.0",
+  "private": true,
+  "description": "text-cli 标准指令服务模板 — Cloudflare Workers + D1",
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "db:create": "wrangler d1 create text-cli-db",
+    "db:migrate": "wrangler d1 execute text-cli-db --file=migrations/0001_init.sql",
+    "db:seed": "node scripts/seed-directives.js"
+  },
+  "devDependencies": {
+    "wrangler": "^3.99.0",
+    "vitest": "^3.1.0"
+  }
+}

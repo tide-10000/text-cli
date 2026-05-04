@@ -1,0 +1,16 @@
+{
+  "name": "text-cli-endpoint",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "test": "vitest run",
+    "seed": "node scripts/seed-schema.js"
+  },
+  "devDependencies": {
+    "wrangler": "^4.14.0",
+    "vitest": "^3.1.1"
+  }
+}
