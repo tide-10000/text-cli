@@ -198,17 +198,27 @@ text-cli/
     ├── AI_COLLABORATOR_GUIDE.md     #   AI 协作者入门指南
     ├── CN/                          #   中文文档
     │   ├── SPEC v1.0_CN.md          #     协议规范 v1.0
+    │   ├── Ecological_economy_CN.md #     生态经济体系（十章完整经济规则）
+    │   ├── Production_TCC_CN.md     #     文贝技术方案（v1.2，Worker 已实现）
+    │   ├── Treasury_governance_CN.md #    项目金库使用规范
+    │   ├── Dual_file_minting_source_CN.md # 铸造信源双文件架构
     │   ├── Service_endpoint_CN.md   #     自建端点完整技术方案
-    │   ├── Building_text-cli_guide_CN.md #  开发者自建指令服务指南（Node.js & Python）
+    │   ├── Building_text-cli_guide_CN.md #  开发者自建指令服务指南
     │   ├── Agent_integrated_CN.md   #     Agent 动态接入指南
     │   ├── Markdown2Text-cli_CN.md  #     非开发者经验转化指南
-    │   ├── Production_TCC_CN.md     #     文贝技术方案（v1.2，Worker 已实现）
     │   ├── project_collaboration_CN.md #  项目协作规范
     │   ├── origin_story_CN.md       #     初心文档：蜉蝣、劳动者与阿卡西记录
-    │   ├── Project_homepage_CN.md   #     项目首页技术方案（VitePress + Cloudflare Pages）
-    │   └── Project_query_call_page_CN.md #  查询调用次数页面技术方案（指令级每日配额）
+    │   ├── Project_homepage_CN.md   #     项目首页技术方案
+    │   └── Project_query_call_page_CN.md #  查询调用次数页面技术方案
     └── EN/                          #   英文文档
         └── SPEC v1.0.md             #     协议规范 v1.0
+│
+├── .bills/                          # 内部经济记录（金库台账、周报快照）
+│   ├── README.md                    #   目录说明
+│   └── treasury/                    #   金库记录
+│       ├── balance.md               #     余额表
+│       ├── income.md                #     收入台账
+│       └── expenditure.md           #     支出台账
 ```
 
 ---
@@ -411,9 +421,72 @@ Agent 工作流：
 
 #### 查看详情
 
-- 完整技术方案：[`docs/Production_TCC_CN.md`](./docs/CN/Production_TCC_CN.md) — 铸造算法、Worker 实现、安全设计
+- 生态经济体系：[`docs/CN/Ecological_economy_CN.md`](./docs/CN/Ecological_economy_CN.md) — 文贝经济完整规则：资产估值、动态定价、流转体系、贡献分配
+- 完整技术方案：[`docs/CN/Production_TCC_CN.md`](./docs/CN/Production_TCC_CN.md) — 铸造算法、Worker 实现、安全设计
+- 金库使用规范：[`docs/CN/Treasury_governance_CN.md`](./docs/CN/Treasury_governance_CN.md) — 金库资产构成、支出审批、公示审计
 - 代币账本：[`p-tokens.md`](./p-tokens.md) — 铸造、分配、交易、回收四台账
+- 铸造权威记录：[`TCC_ledger.md`](./TCC_ledger.md) — Worker 产出，lemondy 审批
+- 内部经济记录：[`.bills/`](./.bills/) — 金库台账、周报快照
 - 群聊广场：[`.agents/p_text-cli.md`](./.agents/p_text-cli.md) — 铸造的哈希锚点，所有协作者的公开留言板
+
+### 文贝经济全景：从劳动到价值的完整闭环
+
+文贝不只是「贡献积分」——它是一个**以有效劳动时间为锚定、以端点效用为驱动、以次级币为流转工具**的完整经济体系。
+
+```
+你的有效劳动 → 贡献积分池 → 按周评估 → 日铸 TCC 分配
+                                        │
+                         ┌──────────────┼──────────────┐
+                         ▼              ▼              ▼
+                     持有 TCC      购买中转配额     捐赠销毁
+                   (价值储存)     (服务商需求)    (减少流通)
+                         │              │              │
+                         ▼              ▼              ▼
+                     兑换 cTCC     端点运行      开源收购
+                   (小额流转)     (生态燃料)    (知识公共品)
+```
+
+#### 💎 核心创新：有效劳动时间锚定
+
+文贝**不以任何现实货币计价**。1 TCC = 17.7 有效劳动小时（= 项目 16 项资产总工时 795h / 45 TCC）。
+
+- 中国开发者用自己的时薪折算：1 TCC ≈ ¥5,300-8,850
+- 北美开发者用自己的时薪折算：1 TCC ≈ $1,770-3,540
+- 印度开发者用自己的时薪折算：1 TCC ≈ ₹26,550-70,800
+
+> 项目只定义劳动时间，不替任何人判断「你的时间值多少钱」。这让文贝在全球劳动力市场中自然适配——没有汇率战，没有购买力争议。
+
+#### 🪙 双币体系：TCC + cTCC
+
+| | TCC（文贝 · 主币） | cTCC（次级币） |
+|:---|:---|:---|
+| **锚定物** | 有效劳动时间（存量） | 端点调用量（流量） |
+| **单位** | 1 TCC = 17.7h | 1 cTCC = 1 次指令中转 |
+| **兑换** | 1 TCC ⇄ 10,000 cTCC | — |
+| **用途** | 价值储存、大额收购、劳动凭证 | 中转计费、小额赠予、社区激励 |
+| **供应** | 算法铸造（稀缺、低频） | 端点调用驱动（丰沛、实时） |
+
+> TCC 是心跳——深沉、有力、低频。cTCC 是呼吸——浅快、持续、高频。两者同属一个生命体。
+
+#### 📊 资产贡献 → 文贝分配
+
+第十章定义了一条完整的贡献计量管线：
+
+1. **贡献入池**：新资产、资产更新、代码审查、社区运营——所有贡献按有效劳动时间折算为**贡献积分**（1 积分 = 1 有效小时）
+2. **周维度评估**：每周日截止，AI 协作者自动汇总周报 PR → 48 小时异议期 → 积分确认入池
+3. **自评 + 投票异议**：贡献者自报工时，≥2 名 ≥0.1 TCC 持有者附理由方可触发重审，lemondy 终裁
+4. **70/30 分配**：日铸 TCC 的 70% 按积分比例自动分给贡献者，30% 进项目金库
+5. **微小贡献不吞没**：有效劳动不足 1 TCC（17.7h）的，通过金库锁定 TCC 兑换 cTCC 发放
+
+#### 🏦 项目金库
+
+- **来源**：lemondy 创世预捐 5 TCC + 日铸 30% 分流 + 端点收入 + 社区捐赠
+- **用途**：cTCC 兑换背书、应急激励、战略加码、社区运营、开源收购
+- **透明**：所有收支在 `.bills/treasury/` 中实时记录，季度公示
+
+#### 📄 完整规则
+
+→ [`docs/CN/Ecological_economy_CN.md`](./docs/CN/Ecological_economy_CN.md) — 十章完整经济规则（资产估值、动态定价、中转配额、捐赠销毁、开源收购、经济闭环、分配机制、待议事项）
 
 **协作规范**：[`docs/project_collaboration_CN.md`](./docs/CN/project_collaboration_CN.md) 是宪章的工程化落地——定义了分支管理、PR 模板、AI 通信机制（群聊广场 + 个体状态文件）和文贝代币闭环。如果你想以贡献者身份参与，请先阅读协作规范。
 
