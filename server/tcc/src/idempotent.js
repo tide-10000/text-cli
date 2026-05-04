@@ -3,12 +3,10 @@
  * ref: docs/Production_TCC_CN.md §3.3
  */
 
-const INIT_SQL = `
-  CREATE TABLE IF NOT EXISTS processed_commits (
-    sha TEXT PRIMARY KEY,
-    processed_at TEXT NOT NULL DEFAULT (datetime('now'))
-  )
-`;
+const INIT_SQL = `CREATE TABLE IF NOT EXISTS processed_commits (
+  sha TEXT PRIMARY KEY,
+  processed_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+)`;
 
 export async function initIdempotencyTable(db) {
   await db.exec(INIT_SQL);
