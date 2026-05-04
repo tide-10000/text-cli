@@ -175,6 +175,7 @@ export async function getRef(owner, repo, ref, env) {
 }
 
 export async function createBranch(owner, repo, branchName, baseSha, env) {
+  try {
   const result = await githubFetchRaw(
     `/repos/${owner}/${repo}/git/refs`,
     env,
@@ -196,6 +197,12 @@ export async function createBranch(owner, repo, branchName, baseSha, env) {
     throw new Error(`Failed to create branch: ${result.body}`);
   }
   return result.json;
+  } catch (err) {
+    if (err.message && err.message.includes('already exists')) {
+      return { sha: baseSha, existed: true };
+    }
+    throw err;
+  }
 }
 
 export async function createOrUpdateFile(owner, repo, path, content, message, branch, sha, env) {
