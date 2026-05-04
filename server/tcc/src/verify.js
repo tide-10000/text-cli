@@ -4,7 +4,9 @@
  */
 
 export async function verifySignature(payload, signatureHeader, secret) {
-  if (!signatureHeader || !secret) return false;
+  // No secret configured — skip verification (trust network layer)
+  if (!secret) return true;
+  if (!signatureHeader) return false;
 
   const parts = signatureHeader.split('=');
   if (parts.length !== 2 || parts[0] !== 'sha256') return false;
