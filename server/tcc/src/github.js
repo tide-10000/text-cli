@@ -14,7 +14,7 @@ async function sleep(ms) {
 async function githubFetch(path, env, options = {}) {
   const url = `${GITHUB_API}${path}`;
   const headers = {
-    'Authorization': `Bearer ${env.GITHUB_TOKEN}`,
+    'Authorization': `Bearer ${env.GH_TOKEN}`,
     'Accept': 'application/vnd.github+json',
     'User-Agent': 'tcc-mint-worker',
     'X-GitHub-Api-Version': '2022-11-28',
@@ -52,7 +52,7 @@ async function githubFetch(path, env, options = {}) {
 async function githubFetchRaw(path, env, options = {}) {
   const url = `${GITHUB_API}${path}`;
   const headers = {
-    'Authorization': `Bearer ${env.GITHUB_TOKEN}`,
+    'Authorization': `Bearer ${env.GH_TOKEN}`,
     'Accept': 'application/vnd.github+json',
     'User-Agent': 'tcc-mint-worker',
     'X-GitHub-Api-Version': '2022-11-28',
