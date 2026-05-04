@@ -1,6 +1,7 @@
 name = "tcc-mint-worker"
 main = "src/index.js"
 compatibility_date = "2026-05-01"
+workers_dev = true
 
 # Worker v2: PR 模式
 # Token 权限需升级为 contents:write, pull_requests:write（另需 issues:write 用于告警）
@@ -15,7 +16,7 @@ RAW_SCORE_THRESHOLD = "200"
 [[d1_databases]]
 binding = "DB"
 database_name = "tcc-idempotency"
-database_id = "placeholder-replace-after-create"
+database_id = "eded8d51-4cb7-46e2-8cda-70cddb7b4d15"
 
 [triggers]
 crons = ["0 0 * * *"]
