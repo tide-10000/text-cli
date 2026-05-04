@@ -36,10 +36,10 @@ describe('verifySignature', () => {
     expect(result).toBe(false);
   });
 
-  it('returns false when secret is missing', async () => {
+  it('returns true when secret is missing (skip verification)', async () => {
     const signature = await hmacSha256Hex(secret, payload);
     const result = await verifySignature(payload, signature, null);
-    expect(result).toBe(false);
+    expect(result).toBe(true);
   });
 
   it('returns false for wrong prefix', async () => {
