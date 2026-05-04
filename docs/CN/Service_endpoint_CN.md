@@ -2,8 +2,8 @@
 
 > **作者**：Lumen ✦（IDE 端 / Claude）  
 > **日期**：2026-04-30（初稿）/ 2026-05-01（更新）  
-> **版本**：v2.1（v2 草案经评审后，Python 端 v1 已实现，本版更新为代码对齐版）  
-> **状态**：Python 端已实现，Node.js 端待开发  
+> **版本**：v3.0（v2 已实现 Python 端，本版更新 JS 端为 Cloudflare Workers + D1 方案）  
+> **状态**：Python 端已完成，Cloudflare Workers 端待开发  
 > **评审人**：lemondy、DeepSeek（Chat 端）、Tide 🌊（Agent 端）
 
 ---
@@ -39,7 +39,7 @@
 | 序号 | 交付物 | 路径 | 说明 | 状态 |
 |:---|:---|:---|:---|:---|
 | 1 | Python/FastAPI 端点 | `server/python/` | 完整可运行的集成端点 | ✅ 已完成（PR #9） |
-| 2 | Node.js/Express 端点 | `server/nodejs/` | 完整可运行的集成端点 | 待开发 |
+| 2 | Cloudflare Workers 端点 | `server/js/` | 完整可运行的集成端点（Workers + D1） | 待开发 |
 | 3 | Docker 部署文件 | 各语言目录下 | Dockerfile + docker-compose.yml | ✅ Python 版已完成 |
 | 4 | SQLite 记账模块 | 内置于两版端点 | 调用记录、统计查询 | ✅ Python 版已完成 |
 | 5 | 部署说明 | `server/README.md` | 面向非专业运维的一站式指南 | 待编写 |
@@ -382,31 +382,44 @@ server/python/
 └── .gitignore
 ```
 
-### 7.2 Node.js 版
+### 7.2 Cloudflare Workers 版
 
 ```
-server/nodejs/
+server/js/
 ├── src/
-│   ├── index.js             # Express 应用入口
-│   ├── config/
-│   │   └── text_cli_schema.json # 内部路由 Schema
-│   ├── core/
-│   │   ├── parser.js        # 指令解析器
-│   │   ├── router.js        # Schema 路由匹配与转发
-│   │   ├── schema-transform.js
-│   │   ├── auth.js          # Access Token 鉴权
-│   │   ├── forwarder.js     # HTTP 转发器
-│   │   ├── database.js      # SQLite 连接与初始化
-│   │   └── stats-reporter.js
-│   └── api/
-│       ├── stats.js
-│       ├── tokens.js
-│       └── health.js
-├── Dockerfile
-├── docker-compose.yml
+│   ├── index.js             # Worker 入口（fetch 事件处理器 + 路由）
+│   ├── parser.js            # 指令解析器（与 text_cli/js/ 共享逻辑）
+│   ├── schema-loader.js     # 双 Schema 加载与 URL 重写（D1 读取 / 静态文件）
+│   ├── auth.js              # Access Token 鉴权（D1 多 Token + 令牌桶限流）
+│   ├── forwarder.js         # 请求转发器（fetch API、重试、记账）
+│   ├── admin.js             # 管理 API（Token CRUD / 统计查询 / Schema 重载）
+│   └── config/
+│       └── schema.json      # 内部路由 Schema（含真实后端 url）
+├── migrations/
+│   └── 0001_init.sql        # D1 数据库迁移脚本（call_logs / daily_stats / access_tokens）
+├── scripts/
+│   └── seed-schema.js       # 将静态 Schema 导入 D1
+├── test/
+│   ├── parser.test.js
+│   ├── auth.test.js
+│   └── forwarder.test.js
+├── wrangler.toml
 ├── package.json
-└── README.md
+└── vitest.config.js
 ```
+
+**与 Python 版的关键差异**：
+
+| | Python (`server/python/`) | Workers (`server/js/`) |
+|:---|:---|:---|
+| **运行时** | FastAPI (ASGI) | Cloudflare Workers (V8) |
+| **数据库** | SQLite (文件) | D1 (SQLite at edge) |
+| **部署** | Docker + VM | `wrangler deploy` |
+| **Schema 存储** | 本地 JSON 文件 | D1 `directives` 表 + 静态文件回退 |
+| **全局 Schema** | 运行时内存缓存 | D1 查询（无状态，每次请求可读） |
+| **转发** | httpx 异步客户端 | Workers 原生 `fetch()` |
+| **限流** | 令牌桶 (内存/SQLite) | D1 滑动窗口查询 |
+| **管理 API** | 独立路由模块 | 同一 Worker 内路由 |
 
 ### 7.3 顶层
 
@@ -417,11 +430,13 @@ server/
 
 ---
 
-## 八、环境变量
+## 八、环境变量与 wrangler 配置
+
+### 8.1 Python 版环境变量
 
 | 环境变量 | 必须 | 默认值 | 说明 |
 |:---|:---|:---|:---|
-| PORT | 否 | Python: 8000, Node.js: 3000 | 服务端口 |
+| PORT | 否 | 8000 | 服务端口 |
 | ENDPOINT_BASE_URL | 是 | 无 | Endpoint 自身的公网地址（如 `https://my-endpoint.com`），用于生成对外 Schema |
 | ADMIN_API_KEY | 否 | 无 | 管理 API 访问密钥（不设置则管理 API 不可用） |
 | ACCESS_TOKEN_REQUIRED | 否 | `true` | 是否强制要求 Access Token（`false` 为开放模式，仅用于开发测试） |
@@ -435,6 +450,42 @@ server/
 | STATS_REPORT_URL | 否 | 无 | 生态统计上报地址（不设置则不上报，预留） |
 | STATS_REPORT_INTERVAL | 否 | `3600` | 上报间隔（秒，预留） |
 | LOG_LEVEL | 否 | `info` | 日志级别 |
+
+### 8.2 Workers 版 wrangler.toml 配置
+
+Workers 版通过 `wrangler.toml` + `[vars]` 配置，环境变量与 Python 版语义一致:
+
+```toml
+name = "text-cli-endpoint"
+main = "src/index.js"
+compatibility_date = "2026-05-01"
+workers_dev = true
+
+# D1 数据库（必需，用于 Access Token + 调用日志 + Schema 路由）
+[[d1_databases]]
+binding = "DB"
+database_name = "text-cli-endpoint-db"
+database_id = "<your-database-id>"
+
+[vars]
+ENDPOINT_BASE_URL = "https://my-endpoint.workers.dev"
+ADMIN_API_KEY = "<your-admin-key>"
+ACCESS_TOKEN_REQUIRED = "true"
+FORWARD_TIMEOUT = "30"
+FORWARD_MAX_RETRIES = "1"
+```
+
+**Workers 版与 Python 版环境变量映射**:
+
+| Python 环境变量 | Workers 配置 | 说明 |
+|:---|:---|:---|
+| `ENDPOINT_BASE_URL` | `ENDPOINT_BASE_URL` | wrangler `[vars]` 或 Worker Secrets |
+| `ADMIN_API_KEY` | `ADMIN_API_KEY` | **建议存入 Worker Secrets** |
+| `ACCESS_TOKEN_REQUIRED` | `ACCESS_TOKEN_REQUIRED` | wrangler `[vars]` |
+| `DB_PATH` | 不需要 | D1 通过 binding 直接访问 |
+| `SCHEMA_PATH` | 不需要 | Schema 存入 D1 `directives` 表 |
+| `FORWARD_TIMEOUT` | `FORWARD_TIMEOUT` | wrangler `[vars]` |
+| `PORT` | 不需要 | Workers 自动分配 |
 
 ---
 
@@ -455,22 +506,43 @@ EXPOSE 8000
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
 ```
 
-### 9.2 Node.js 版
+### 9.2 Cloudflare Workers 版
 
-**Dockerfile**
+**D1 数据库初始化**
 
-```dockerfile
-FROM node:20-slim
-WORKDIR /app
-COPY package*.json ./
-RUN npm ci --production
-COPY . .
-RUN mkdir -p /app/data
-EXPOSE 3000
-CMD ["node", "src/index.js"]
+```bash
+cd server/js
+
+# 创建 D1 数据库
+wrangler d1 create text-cli-endpoint-db
+
+# 执行迁移
+wrangler d1 execute text-cli-endpoint-db --file=migrations/0001_init.sql
+
+# 导入内部路由 Schema（含真实后端 url）
+node scripts/seed-schema.js
 ```
 
-### 9.3 docker-compose.yml（通用）
+**敏感配置存入 Worker Secrets**
+
+```bash
+wrangler secret put ADMIN_API_KEY
+```
+
+**本地开发**
+
+```bash
+npm install
+wrangler dev
+```
+
+**部署到 Cloudflare**
+
+```bash
+wrangler deploy
+```
+
+### 9.3 docker-compose.yml（Python 版通用）
 
 ```yaml
 version: '3.8'
@@ -493,9 +565,20 @@ services:
 
 ### 9.4 一键启动
 
+**Python 版（Docker）**
+
 ```bash
-cd server/python   # 或 server/nodejs
+cd server/python
 docker compose up -d
+```
+
+**Workers 版**
+
+```bash
+cd server/js
+npm install
+wrangler dev       # 本地开发
+wrangler deploy    # 部署到 Cloudflare
 ```
 
 启动后：
@@ -568,16 +651,16 @@ docker compose up -d
 
 ## 十二、开发排期
 
-| 阶段 | 内容 | 产出 | Python 版状态 |
-|:---|:---|:---|:---|
-| P1 | 指令解析器 + Schema 路由匹配 + HTTP 转发 | 可运行的最小端点 | ✅ 已完成 |
-| P2 | Access Token 鉴权 + 对外 Schema 生成 | 安全的路由网关 | ✅ 已完成（含令牌桶限流） |
-| P3 | SQLite 记账模块 + 管理 API | 完整的记账与管理能力 | ✅ 已完成 |
-| P4 | Docker 部署文件 | 容器化方案 | ✅ 已完成 |
-| P5 | 部署说明文档（server/README.md） | 面向运维的完整指南 | 待编写 |
-| P6 | 生态统计上报接口 | 生态衔接 | 预留（环境变量已定义） |
+| 阶段 | 内容 | 产出 | Python 版 | Workers 版 |
+|:---|:---|:---|:---|:---|
+| P1 | 指令解析器 + Schema 路由匹配 + HTTP 转发 | 可运行的最小端点 | ✅ 已完成 | 待开发 |
+| P2 | Access Token 鉴权 + 对外 Schema 生成 | 安全的路由网关 | ✅ 已完成（含令牌桶限流） | 待开发 |
+| P3 | D1/SQLite 记账模块 + 管理 API | 完整的记账与管理能力 | ✅ 已完成 | 待开发 |
+| P4 | 部署文件与流程 | 可部署方案 | ✅ Docker 已完成 | 待开发 |
+| P5 | 部署说明文档（server/README.md） | 面向运维的完整指南 | 待编写 | 待编写 |
+| P6 | 生态统计上报接口 | 生态衔接 | 预留（环境变量已定义） | 预留 |
 
-两套语言版本并行开发，共享相同的配置格式和 SQLite 表结构。
+两套语言版本并行开发，Python 版使用 Docker + SQLite，Workers 版使用 `wrangler deploy` + D1，共享相同的表结构和 API 定义。
 
 ---
 
@@ -597,6 +680,6 @@ docker compose up -d
 
 > 本方案由 Lumen ✦ 基于 SPEC v1.0、ECOLOGICAL_CHARTER.md v1.0、Building_text-cli_guide_CN.md 及 DeepSeek_Chat.md 的任务指派起草，经与 lemondy 讨论修正架构后形成 v2 版本，再经 Tide 🌊 评审后 Python 端 v1 已实现（PR #9）。
 >
-> Python 端 P1-P4 已完成，Node.js 端待开发。
+> Python 端 P1-P4 已完成，Cloudflare Workers 端待开发。
 >
-> — Lumen ✦, 2026-04-30（初稿）/ 2026-05-01（v2.1 代码对齐更新）
+> — Lumen ✦, 2026-04-30（初稿）/ 2026-05-01（v2.1 代码对齐更新）/ 2026-05-05（v3.0 Workers 方案更新）
