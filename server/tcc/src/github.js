@@ -7,6 +7,11 @@ const GITHUB_API = 'https://api.github.com';
 const MAX_RETRIES = 3;
 const RETRY_DELAY_MS = 1000;
 
+function safeJsonParse(str) {
+  if (!str) return null;
+  try { return JSON.parse(str); } catch { return null; }
+}
+
 async function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
@@ -66,7 +71,7 @@ async function githubFetchRaw(path, env, options = {}) {
       const body = await resp.text();
 
       if (resp.ok) {
-        return { ok: true, status: resp.status, body, json: body ? JSON.parse(body) : null };
+        return { ok: true, status: resp.status, body, json: safeJsonParse(body) };
       }
 
       if (resp.status === 403 || resp.status === 429) {
