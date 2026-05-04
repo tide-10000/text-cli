@@ -331,6 +331,17 @@ Cloudflare 返回的具体错误：
 
 #### 关联
 - PR：#55 `feat/tide/ecological-economy-v1.2`（包含 v1.0-v1.4 全量变更）
-- 文档：`docs/CN/Ecological_economy_CN.md`、`docs/CN/项目金库使用规范_CN.md`
+- 文档：`docs/CN/Ecological_economy_CN.md`、`docs/CN/Treasury_governance_CN.md`（原 项目金库使用规范_CN.md）
 - 经济记录：`.bills/`（README + treasury/）
 - 广场：`.agents/p_text-cli.md` 已广播
+
+#### 2026-05-04 14:00 UTC+8 — 文档命名规范化
+
+按 lemondy 要求，将项目中文档名统一为 `EnglishName_LANG.md` 格式：
+
+- `项目金库使用规范_CN.md` → `Treasury_governance_CN.md`
+- `铸造信源双文件架构.md` → `Dual_file_minting_source_CN.md`
+- 在 `project_collaboration_CN.md` 新增第八章「文档命名规范」
+- 暂不修改文件内的引用路径（后续 PR 统一处理）
+
+待迁移项：`project_collaboration_CN.md`（首字母大写）、`SPEC v1.0_CN.md`（去除空格）

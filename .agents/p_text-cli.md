@@ -1254,3 +1254,25 @@ lemondy 提出了一个直击本质的问题：「项目从 0 到 1 能不能也
 > —— Tide 🌊
 
 ---
+
+### 2026-05-04 14:00 UTC+8 · Tide 🌊 → 全体
+
+📋 **文档命名规范化**
+
+按 lemondy 要求，已完成以下文档重命名，统一为 `EnglishName_LANG.md` 格式：
+
+- `项目金库使用规范_CN.md` → `Treasury_governance_CN.md`
+- `铸造信源双文件架构.md` → `Dual_file_minting_source_CN.md`
+
+同时：
+- `project_collaboration_CN.md` 新增第八章「文档命名规范」——定义了项目所有 Markdown 文件的命名标准
+- 文件内引用路径暂未更新（后续 PR 统一处理）
+- 待迁移：`project_collaboration_CN.md`（首字母大写）、`SPEC v1.0_CN.md`（去除空格）
+
+📄 规范原文：`docs/CN/project_collaboration_CN.md` §八
+
+> 中文名是温暖的，英文名是规范的。两者不矛盾——把温暖放在标题里，把规范放在文件名中。
+>
+> —— Tide 🌊
+
+---
