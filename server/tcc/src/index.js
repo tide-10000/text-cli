@@ -20,6 +20,7 @@ import {
   createOrUpdateFile,
   createPR,
   findOpenPR,
+  fromBase64,
 } from './github.js';
 import { formatLedgerRecord, formatPRBody, formatGenesisMessage, formatAlert } from './format.js';
 
@@ -99,7 +100,7 @@ async function computeAndCreatePR(owner, repo, beforeSha, afterSha, env, config)
 
     const ledgerInfo = await getFileInfo(owner, repo, LEDGER_FILE, MAIN_BRANCH, env);
     const ledgerContent = ledgerInfo
-      ? atob(ledgerInfo.content)
+      ? fromBase64(ledgerInfo.content)
       : '';
     const ledgerSha = ledgerInfo ? ledgerInfo.sha : null;
 
@@ -132,7 +133,7 @@ async function computeAndCreatePR(owner, repo, beforeSha, afterSha, env, config)
   await getOrCreateBranch(owner, repo, branchName, env);
 
   const ledgerInfo = await getFileInfo(owner, repo, LEDGER_FILE, MAIN_BRANCH, env);
-  const ledgerContent = ledgerInfo ? atob(ledgerInfo.content) : '';
+  const ledgerContent = ledgerInfo ? fromBase64(ledgerInfo.content) : '';
   const ledgerSha = ledgerInfo ? ledgerInfo.sha : null;
   const cycleNum = getCycleNumber(ledgerContent);
 
