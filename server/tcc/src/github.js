@@ -12,6 +12,13 @@ function safeJsonParse(str) {
   try { return JSON.parse(str); } catch { return null; }
 }
 
+function toBase64(str) {
+  const bytes = new TextEncoder().encode(str);
+  let binary = '';
+  for (const b of bytes) binary += String.fromCharCode(b);
+  return btoa(binary);
+}
+
 async function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
@@ -208,7 +215,7 @@ export async function createBranch(owner, repo, branchName, baseSha, env) {
 export async function createOrUpdateFile(owner, repo, path, content, message, branch, sha, env) {
   const body = {
     message,
-    content: btoa(content),
+    content: toBase64(content),
     branch,
   };
   if (sha) {
