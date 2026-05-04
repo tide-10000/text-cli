@@ -61,3 +61,14 @@
 算法总计: 43 TCC
 实际铸造: 45 TCC (lemondy 加权确认)
 ```
+
+## 周期 #1
+- **日期:** 2026-05-04
+- **delta_bytes:** 313
+- **raw_score:** 684.18
+- **mint_ceiling:** 7 TCC
+- **实际铸造:** ⏳ 待 lemondy 确认（0 ~ 7 TCC）
+- **diff 范围:** `0e5eb81..d5d0a5c`
+- **分配:** 见 A-台账 周期 #1
+- **执行:** Cloudflare Worker
+- **验证:** 任何人可通过 `git diff` 复算
