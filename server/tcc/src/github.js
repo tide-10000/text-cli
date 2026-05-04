@@ -88,12 +88,12 @@ async function githubFetchRaw(path, env, options = {}) {
 }
 
 export async function getFileContent(owner, repo, path, ref, env) {
-  const data = await githubFetch(
+  const result = await githubFetchRaw(
     `/repos/${owner}/${repo}/contents/${path}?ref=${ref}`,
     env,
     { headers: { 'Accept': 'application/vnd.github.raw+json' } },
   );
-  return typeof data === 'string' ? data : '';
+  return result.ok ? result.body : '';
 }
 
 export async function getFileInfo(owner, repo, path, ref, env) {
