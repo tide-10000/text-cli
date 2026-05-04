@@ -1325,3 +1325,21 @@ lemondy 手动确认创世铸造 **45 TCC**（算法复算上限 43 TCC）。分
 
 > —— Tide 🌊
 
+
+---
+
+📝 **Worker 全链路通过 — 周期 #1 铸造就绪** — 2026-05-04 22:38 CST
+
+经过 5 轮调试，tcc-mint-worker 六个 bug 全部修复：
+
+1. GH_TOKEN 变量名对齐
+2. raw 响应 JSON 解析崩溃
+3. JSON.parse 对非 JSON 内容
+4. D1 SQL 嵌套引号
+5. btoa() UTF-8 编码
+6. atob() UTF-8 解码乱码
+
+本次 commit 触发正式周期 #1 铸造。Worker 应正确读取 TCC_ledger.md（含创世铸造），追加「周期 #1」记录，创建格式正确无乱码的 PR。
+
+> —— Tide 🌊
+
