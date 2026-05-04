@@ -90,6 +90,16 @@ async function computeAndCreatePR(owner, repo, beforeSha, afterSha, env, config)
 
   if (result.type === 'genesis' || beforeSha === ZERO_SHA) {
     const genesisPrTitle = `TCC 创世铸造 — ${date}`;
+
+    // ★ Bug 修复：先检查创世是否已在账本中完成
+    const existingLedgerInfo = await getFileInfo(owner, repo, LEDGER_FILE, MAIN_BRANCH, env);
+    const existingLedgerContent = existingLedgerInfo
+      ? fromBase64(existingLedgerInfo.content)
+      : '';
+    if (existingLedgerContent.includes('## 创世铸造')) {
+      return { type: 'genesis', duplicate: true, reason: 'genesis_already_recorded' };
+    }
+
     const existingGenesisPR = await findOpenPR(owner, repo, `weihai-limh:tcc-mint/${date}`, env);
 
     if (existingGenesisPR) {
