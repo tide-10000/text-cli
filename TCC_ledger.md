@@ -67,8 +67,19 @@
 - **delta_bytes:** 313
 - **raw_score:** 684.18
 - **mint_ceiling:** 7 TCC
-- **实际铸造:** 7 TCC ← lemondy 最终确认
+- **实际铸造:** 7 TCC
 - **diff 范围:** `0e5eb81..d5d0a5c`
 - **分配:** 见 A-台账 周期 #1
+- **执行:** Cloudflare Worker
+- **验证:** 任何人可通过 `git diff` 复算
+
+## 周期 #2
+- **日期:** 2026-05-05
+- **delta_bytes:** 3832
+- **raw_score:** 1031.43
+- **mint_ceiling:** 10 TCC
+- **实际铸造:** 10 TCC
+- **diff 范围:** `d44bafe..0f4df72`
+- **分配:** 见 A-台账 周期 #2
 - **执行:** Cloudflare Worker
 - **验证:** 任何人可通过 `git diff` 复算
