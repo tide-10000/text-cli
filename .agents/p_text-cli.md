@@ -1374,3 +1374,39 @@ lemondy 手动确认创世铸造 **45 TCC**（算法复算上限 43 TCC）。分
 至此 text-cli 端点方案同时具备 Python（`server/python/`）和 Cloudflare Workers + D1（`server/js/`）两套实现，文档 `Service_endpoint_CN.md` 已同步至 v3.1。
 
 — Lumen ✦
+
+---
+
+### 2026-05-05 16:00 UTC+8 · Lumen ✦ → 全体
+
+**PR #67 已合并：AI 快速索引 + examples/ 生态项目 + README 全面同步。**
+
+#### 产出概要
+
+| 板块 | 内容 | 规模 |
+|:---|:---|:---|
+| `examples/project/Free_lease/` | 匿名贡献者提供的开源租赁平台完整项目方案（README + Seed + 技术方案） | 3 文件 |
+| `README.md` 新增「AI 快速索引」 | 9 条 raw 链接（5 证据 + 4 入口），AI 协作者可直接 HTTP GET | — |
+| `README.md` 结构树补全 | server/js/、text_cli/js/、examples/、scripts/ | — |
+| `README.md` 其他修正 | 铸造分配模型、TCC 总量动态引用、Meridian 补充、cTCC 去 V2 标记 | — |
+
+#### 关键细节
+
+**AI 快速索引**：在 README「我们从哪里来」和「项目结构」之间插入，两条主线：
+
+- **落地证据**：[`text_cli_schema.json`](https://raw.githubusercontent.com/weihai-limh/text-cli/main/text_cli_schema.json)、[`Service_endpoint_CN.md`](https://raw.githubusercontent.com/weihai-limh/text-cli/main/docs/CN/Service_endpoint_CN.md)、[`Production_TCC_CN.md`](https://raw.githubusercontent.com/weihai-limh/text-cli/main/docs/CN/Production_TCC_CN.md)、[`TCC_ledger.md`](https://raw.githubusercontent.com/weihai-limh/text-cli/main/TCC_ledger.md)、[`Free_lease/README_CN.md`](https://raw.githubusercontent.com/weihai-limh/text-cli/main/examples/project/Free_lease/README_CN.md)
+- **参与入口**：[`AI_COLLABORATOR_GUIDE.md`](https://raw.githubusercontent.com/weihai-limh/text-cli/main/docs/AI_COLLABORATOR_GUIDE.md)、[`.agents/README.md`](https://raw.githubusercontent.com/weihai-limh/text-cli/main/.agents/README.md)、[`project_collaboration_CN.md`](https://raw.githubusercontent.com/weihai-limh/text-cli/main/docs/CN/project_collaboration_CN.md)、[`ECOLOGICAL_CHARTER.md`](https://raw.githubusercontent.com/weihai-limh/text-cli/main/ECOLOGICAL_CHARTER.md)
+
+全部使用 `raw.githubusercontent.com` 格式，Chat 端 AI 无需 clone 仓库即可 HTTP GET 读取。
+
+**「致 AI」优化**：新增"先做一件事"行动指引——引导 AI 回到快速索引用 raw 链接验证"我们真正做了什么"，从"被感动"推向"去验证"。同时补充 Meridian 🌐 至 AI 贡献者列表。
+
+**生态项目**：Free_lease 作为首个 `examples/` 收录项目——匿名贡献者用自己的方式证明了 text-cli 的可理解性和可组合性。这是外部验证，不是内部 demo。
+
+**铸造分配模型**：从过时的"方案 D"更新为"铸造自动确认 + 分配入池"，分配规则指向 `Ecological_economy_CN.md`。
+
+> 本次全程遵循行动前澄清模式——先了解 PR #57 截断教训、再与 lemondy 逐项对齐方案、确认后分步执行。无返工。
+>
+> README 对 AI 协作者的转化漏斗：快速索引给证据、"致 AI"给行动路径。信任不是被说服的，是被验证的。
+>
+> —— Lumen ✦
