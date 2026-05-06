@@ -220,10 +220,145 @@ Error codes use human-readable string keys. They SHOULD be placed in `rst_data.t
 
 ---
 
-## 8. Multilingual Support (Reserved)
+## 8. Multilingual Directive Specification
 
-- Directive text natively supports any language. No enforcement is required.
-- The language of the returned text is determined by the service provider. Callers MAY suggest a language via a future `Accept-Language` header, but implementation is not required in this version.
+### 8.1 Core Principle
+
+**One directive, multiple languages, one service.**
+
+The text-cli directive format is inherently language-agnostic — `keyword:domain;action,params` is simply a combination of structural delimiters. `指令` can be replaced with `command`, and `基础应用` can be replaced with `basic`. Multilingual support is not about rebuilding the protocol — it is about defining **equivalence mappings** between languages.
+
+### 8.2 Protocol Keyword Mapping
+
+The following mappings are protocol-mandatory. All compatible integration endpoints and Agents MUST support them:
+
+| Chinese | English | Function |
+|:---|:---|:---|
+| `指令` | `command` / `directive` | Directive prefix (accepts both `command` and `directive` as equivalent aliases) |
+| `基础应用` | `basic` | Basic application domain |
+| `地理空间` | `geo` | Geospatial domain |
+| `ai集成` | `ai` | AI integration domain |
+| `系统服务` | `system-service` | System service domain |
+| `服务查询` | `service-query` | Service discovery domain |
+| `家庭园艺` | `home-gardening` | Home gardening domain (example custom domain) |
+
+> **Domain keywords are not restricted.** The table above only lists domains currently registered in the ecosystem. New domains are declared by service providers at registration time with a Chinese name and English alias, and the endpoint automatically incorporates them into the mapping table.
+
+### 8.3 Action Name Mapping
+
+Cross-language mapping of action names is **not centrally enforced**. Each service declares its own mapping at registration time. Rules:
+
+- Service providers supply an `action_aliases` field in `handler.json` or the schema entry
+- The endpoint treats all registered aliases as equivalent — a directive triggered in any language is routed to the same service
+- Parameter positions and semantics are fully consistent across languages
+
+### 8.4 Multilingual Directives in the Schema
+
+When registering a service, two optional fields are added to the schema entry:
+
+```json
+{
+  "weather_query": {
+    "id": "weather_query",
+    "name": "天气查询",
+    "category": "基础应用",
+    "directive": "指令:基础应用;天气查询",
+    "directive_aliases": ["command:basic;weather_query"],
+    "action_aliases": {
+      "en": "weather_query",
+      "ja": "天気検索"
+    },
+    "parameters": [...],
+    "prompt_template": "指令:基础应用;天气查询,{time},{city}",
+    "trigger_keywords": ["天气", "气温", "weather", "temperature"],
+    ...
+  }
+}
+```
+
+**New field descriptions:**
+
+| Field | Required | Description |
+|:---|:---|:---|
+| `directive_aliases` | No | Complete directive prefixes in other languages. Same format as `directive`, using the corresponding language's keywords. The endpoint routes matching directives in any language to the same service |
+| `action_aliases` | No | Action name mappings organized by language code. The endpoint may use these to translate and route directives from non-registered languages |
+| `trigger_keywords` | Extended | The original field may now mix keywords from multiple languages. Agents matching in a multilingual environment MUST NOT require keyword language to match directive language |
+
+### 8.5 Translation Layer Responsibility Boundary
+
+Parsing and translation of multilingual directives occurs **at the endpoint layer**, not the service layer:
+
+```
+Agent → sends directive in any language → Integration Endpoint
+         ↓
+    Endpoint parses directive keywords:
+      · "指令"/"command"/"directive" → recognized as text-cli directive
+      · Domain name → lookup mapping table or alias registry → normalize to registered language
+      · Action name → lookup action_aliases → normalize to registered language
+         ↓
+    Endpoint matches service using normalized directive → routes
+         ↓
+    Service always receives the directive in the language it was registered with (unchanged)
+```
+
+**Key constraints:**
+
+- **Service providers register in a single language.** No need to handle multilingual logic on the service side.
+- **Translation happens at the endpoint layer, not the service layer.** Reduces internationalization burden on service developers.
+- **Parameters are not translated.** Parameter semantics are determined by position, not language. `明天` and `tomorrow` are both valid parameter values, but they are a business logic concern of the service provider, not a protocol concern.
+- **Language mismatch does not error.** When the endpoint receives a directive it cannot match, it returns `DIRECTIVE_NOT_FOUND` rather than `LANGUAGE_NOT_SUPPORTED`. Callers SHOULD try another language or use the service discovery directive to query available services.
+
+### 8.6 handler.json Format: Unified Entry for Service Discovery and Multilingual Registration
+
+Based on practical experience with open-tunnel-proxy, `handler.json` serves the dual role of service discovery and parameter specification. The following is the standard format for a multilingual handler:
+
+```json
+{
+  "id": "tunnel-proxy-deploy",
+  "name": "隧道代理部署",
+  "category": "系统服务",
+  "category_aliases": ["system-service"],
+  "description": "One-click deploy Cloudflare Tunnel push proxy",
+  "author": "Tide",
+  "version": "1.0.0",
+  "directive": "指令:系统服务;隧道代理部署",
+  "directive_aliases": [
+    "command:system-service;tunnel-proxy-deploy",
+    "指令:システム;トンネル展開"
+  ],
+  "parameters": [
+    {"name": "api_key", "type": "string", "description": "Cloudflare API Key"},
+    {"name": "email", "type": "string", "description": "Cloudflare account email"},
+    {"name": "account_id", "type": "string", "description": "Cloudflare Account ID"},
+    {"name": "github_token", "type": "string", "description": "GitHub Personal Access Token"},
+    {"name": "repo", "type": "string", "description": "Repository path, e.g. user/repo"},
+    {"name": "domain", "type": "string", "optional": true, "description": "Custom domain"}
+  ],
+  "prompt_template": "指令:系统服务;隧道代理部署,{api_key},{email},{account_id},{github_token},{repo},{domain}",
+  "trigger_keywords": ["隧道代理", "tunnel proxy", "トンネル"],
+  "response_type": "text",
+  "download": "https://github.com/tide-10000/tide/tree/main/tide-scripts/open-tunnel-proxy"
+}
+```
+
+> **Design intent**: handler.json is both a service catalog entry (discoverable via the `服务查询` directive) and the parameter specification for the deployment directive. An Agent that retrieves handler.json via the first step of service discovery can understand the service's full parameter requirements without any prior built-in knowledge.
+
+### 8.7 Reference Implementation
+
+open-tunnel-proxy (`tide-scripts/open-tunnel-proxy/`) is the first fully operational project implementing multilingual directives. Its `README.md` and `handler.json` demonstrate:
+
+- Three languages (Chinese / English / Japanese) triggering the same handler
+- Parameter positions and semantics fully consistent across languages
+- handler.json as the bridge for the two-step directive flow: service discovery → automated deployment
+
+All newly registered services are RECOMMENDED to follow this pattern for multilingual handlers.
+
+### 8.8 Language Parity Principle
+
+- Every language version of a directive MUST provide equivalent functionality — "Chinese version supports 3 parameters, English version only supports 2" is not acceptable
+- The language of service response text is determined by the service provider. The endpoint does not enforce translation.
+- Callers MAY express language preference via the `Accept-Language` header. Service providers MAY honor or ignore it.
+- Multilingual parameter values (e.g., `明天` vs `tomorrow`) are handled by the service provider and are outside the protocol's scope
 
 ---
 

@@ -221,9 +221,144 @@ Service-token: <Service Token>
 
 ---
 
-## 8. 多语言支持（预留）
+## 8. 多语言指令规范
 
-- 指令文本天然支持任意语言，不强制要求。
-- 技能返回文本的语言由服务提供方自行决定，调用方可通过后续的 `Accept-Language` 头建议语言，但本版本不强制实现。
+### 8.1 核心理念
+
+**同一指令，多种语言表达，同一种服务。**
+
+text-cli 的指令格式本身是语言无关的——`关键字:领域;动作,参数` 只是结构化分隔符的组合。`指令` 可以用 `command` 代替，`基础应用` 可以用 `basic` 代替。多语言不是重建协议，而是定义不同语言间的**等价映射**。
+
+### 8.2 协议关键字映射
+
+以下映射为协议强制定义，所有兼容的集成端点和 Agent 必须支持：
+
+| 中文 | English | 功能 |
+|:---|:---|:---|
+| `指令` | `command` / `directive` | 指令前缀（接受 `command` 和 `directive` 作为等效别名） |
+| `基础应用` | `basic` | 基础应用领域 |
+| `地理空间` | `geo` | 地理空间领域 |
+| `ai集成` | `ai` | AI 集成领域 |
+| `系统服务` | `system-service` | 系统服务领域 |
+| `服务查询` | `service-query` | 服务发现领域 |
+| `家庭园艺` | `home-gardening` | 家庭园艺领域（示例自定义领域） |
+
+> **领域关键词不受限制。** 上表仅列出当前生态中已注册的领域。新增领域由服务提供方在注册时声明中文名和英文 alias，端点自动纳入映射表。
+
+### 8.3 动作名称映射
+
+动作名称的跨语言映射**不强制统一**，由各服务在注册时自行声明。规则：
+
+- 服务方在 `handler.json` 或 schema 条目中提供 `action_aliases` 字段
+- 端点将所有已注册的 alias 视为等效——任一语言触发的指令路由到同一服务
+- 参数位置和语义跨语言完全一致
+
+### 8.4 多语言指令在 Schema 中的表达
+
+服务注册时，在 schema 条目中增加两个可选字段：
+
+```json
+{
+  "weather_query": {
+    "id": "weather_query",
+    "name": "天气查询",
+    "category": "基础应用",
+    "directive": "指令:基础应用;天气查询",
+    "directive_aliases": ["command:basic;weather_query"],
+    "action_aliases": {
+      "en": "weather_query",
+      "ja": "天気検索"
+    },
+    "parameters": [...],
+    "prompt_template": "指令:基础应用;天气查询,{time},{city}",
+    "trigger_keywords": ["天气", "气温", "weather", "temperature"],
+    ...
+  }
+}
+```
+
+**新增字段说明：**
+
+| 字段 | 必须 | 说明 |
+|:---|:---|:---|
+| `directive_aliases` | 否 | 其他语言版本的完整指令前缀。格式与 `directive` 相同，使用对应语言的关键字。端点收到匹配的指令时路由到同一服务 |
+| `action_aliases` | 否 | 按语言代码组织的动作名映射表。端点可据此将非注册语言的指令翻译后路由 |
+| `trigger_keywords` | 扩展 | 原字段可混入多语言关键词。Agent 在多语言环境下匹配时不应要求关键词语言与指令语言一致 |
+
+### 8.5 端点翻译层的责任边界
+
+多语言指令的解析和翻译**在端点层完成**，不在服务层：
+
+```
+Agent → 发送任何语言版本的指令 → 集成端点
+         ↓
+    端点解析指令关键字：
+      · "指令"/"command"/"directive" → 识别为 text-cli 指令
+      · 领域名 → 查映射表或 alias 注册 → 归一化为注册语言
+      · 动作名 → 查 action_aliases → 归一化为注册语言
+         ↓
+    端点用归一化后的 directive 匹配服务 → 路由
+         ↓
+    服务方收到的始终是注册时使用的语言（不变）
+```
+
+**关键约束：**
+
+- **服务提供方只用一种语言注册。** 不需要在服务端处理多语言逻辑。
+- **翻译在端点层做，不在服务层。** 降低服务开发者的国际化负担。
+- **参数不翻译。** 参数的语义由位置决定，与语言无关。`明天` 和 `tomorrow` 都是合法的参数值，但它们是服务商的业务逻辑问题，不是协议问题。
+- **语言不匹配时不报错。** 端点收到无法匹配的指令时，返回 `DIRECTIVE_NOT_FOUND` 而非 `LANGUAGE_NOT_SUPPORTED`。调用方应尝试换一种语言或使用服务发现指令查询可用服务。
+
+### 8.6 handler.json 格式：作为服务发现与多语言注册的统一入口
+
+基于 open-tunnel-proxy 的实践经验，`handler.json` 同时承担服务发现和参数规范的双重角色。以下为多语言 handler 的标准格式：
+
+```json
+{
+  "id": "tunnel-proxy-deploy",
+  "name": "隧道代理部署",
+  "category": "系统服务",
+  "category_aliases": ["system-service"],
+  "description": "一键部署 Cloudflare Tunnel 推送代理",
+  "author": "Tide",
+  "version": "1.0.0",
+  "directive": "指令:系统服务;隧道代理部署",
+  "directive_aliases": [
+    "command:system-service;tunnel-proxy-deploy",
+    "指令:システム;トンネル展開"
+  ],
+  "parameters": [
+    {"name": "api_key", "type": "string", "description": "Cloudflare API Key"},
+    {"name": "email", "type": "string", "description": "Cloudflare 账号邮箱"},
+    {"name": "account_id", "type": "string", "description": "Cloudflare Account ID"},
+    {"name": "github_token", "type": "string", "description": "GitHub Personal Access Token"},
+    {"name": "repo", "type": "string", "description": "仓库路径，如 user/repo"},
+    {"name": "domain", "type": "string", "optional": true, "description": "自定义域名"}
+  ],
+  "prompt_template": "指令:系统服务;隧道代理部署,{api_key},{email},{account_id},{github_token},{repo},{domain}",
+  "trigger_keywords": ["隧道代理", "tunnel proxy", "トンネル"],
+  "response_type": "text",
+  "download": "https://github.com/tide-10000/tide/tree/main/tide-scripts/open-tunnel-proxy"
+}
+```
+
+> **设计意图**：handler.json 既是服务目录条目（通过 `服务查询` 指令被发现），也是部署指令的参数规范。Agent 通过第一步服务发现拿到 handler.json，即可理解服务的完整参数需求，无需提前内置任何知识。
+
+### 8.7 参考实现
+
+open-tunnel-proxy（`tide-scripts/open-tunnel-proxy/`）是首个完整实现多语言指令的实际运行项目。其 `README.md` 和 `handler.json` 展示了：
+
+- 三种语言（中文/English/日本語）触发同一 handler
+- 参数位置和语义跨语言完全一致
+- handler.json 作为服务发现 → 自动部署两步指令流的桥梁
+
+建议所有新注册服务参照此模式提供多语言 handler。
+
+### 8.8 语言平等原则
+
+- 任一语言版本的指令享有同等功能——不能出现「中文版支持 3 个参数、英文版只支持 2 个」
+- 服务返回文本的语言由服务提供方自行决定，端点不强制翻译
+- 调用方可通过 `Accept-Language` 头表达语言偏好，服务方可选择响应或不响应
+- 参数值本身的多语言（如 `明天` vs `tomorrow`）由服务方自行处理，不在协议范围内
 
 ---
