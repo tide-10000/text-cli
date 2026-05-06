@@ -2,12 +2,12 @@
  * TCC Mint Worker — Main Entry
  * ref: docs/Production_TCC_CN.md §3
  *
- * v2: PR 模式 — Worker 将铸造结果通过 GitHub PR 提交，
- *     写入 TCC_ledger.md，lemondy 审批后合并生效。
+ * v3: 严格每日一次 UTC 0:00 Cron 触发。
+ *     移除 webhook 事件驱动，不再响应 GitHub push 事件。
+ *     铸造写入 TCC_ledger.md，lemondy 审批后合并生效。
  */
 
 import { calculateMint } from './mint.js';
-import { verifySignature } from './verify.js';
 import { isProcessed, markProcessed, initIdempotencyTable } from './idempotent.js';
 import {
   getFileContent,
@@ -22,7 +22,7 @@ import {
   findOpenPR,
   fromBase64,
 } from './github.js';
-import { formatLedgerRecord, formatPRBody, formatGenesisMessage, formatAlert } from './format.js';
+import { formatLedgerRecord, formatPRBody, formatAlert } from './format.js';
 
 const ZERO_SHA = '0000000000000000000000000000000000000000';
 const LEDGER_FILE = 'TCC_ledger.md';
@@ -188,62 +188,21 @@ async function computeAndCreatePR(owner, repo, beforeSha, afterSha, env, config)
 
 export default {
   async fetch(request, env) {
-    try {
-    if (request.method !== 'POST') {
-      return new Response('Method not allowed', { status: 405 });
+    const url = new URL(request.url);
+
+    if (url.pathname === '/api/health') {
+      return Response.json({
+        status: 'ok',
+        trigger: 'scheduled',
+        schedule: '0 0 * * *',
+        description: '严格每日一次 UTC 0:00 Cron 触发。不再响应 webhook 推送事件。'
+      });
     }
 
-    const signature = request.headers.get('X-Hub-Signature-256');
-    const payload = await request.text();
-
-    if (!await verifySignature(payload, signature, env.WEBHOOK_SECRET)) {
-      return new Response('Invalid signature', { status: 401 });
-    }
-
-    const body = JSON.parse(payload);
-
-    if (body.zen) {
-      return new Response(JSON.stringify({ message: 'ping received' }));
-    }
-
-    const commits = body.commits || [];
-    const { owner, repo } = parseRepo(env);
-    const config = await getConfig(env);
-
-    const modified = commits.some(c =>
-      (c.modified || []).includes(config.anchorFile) ||
-      (c.added || []).includes(config.anchorFile)
-    );
-
-    if (!modified) {
-      return new Response(JSON.stringify({ message: 'anchor_file_not_modified' }));
-    }
-
-    const beforeSha = body.before;
-    const afterSha = body.after;
-
-    if (beforeSha === ZERO_SHA) {
-      const result = await computeAndCreatePR(owner, repo, beforeSha, afterSha, env, config);
-      return new Response(JSON.stringify(result));
-    }
-
-    if (env.DB) {
-      await initIdempotencyTable(env.DB);
-      if (await isProcessed(env.DB, afterSha)) {
-        return new Response(JSON.stringify({ message: 'already_processed' }));
-      }
-    }
-
-    const result = await computeAndCreatePR(owner, repo, beforeSha, afterSha, env, config);
-
-    if (env.DB) {
-      await markProcessed(env.DB, afterSha);
-    }
-
-    return new Response(JSON.stringify(result));
-    } catch (err) {
-      return new Response(JSON.stringify({ error: err.message, stack: err.stack }), { status: 500 });
-    }
+    return new Response('方法不允许。本 Worker 仅通过 Cron 定时触发，不接受外部请求。', {
+      status: 405,
+      headers: { 'Content-Type': 'text/plain; charset=utf-8' }
+    });
   },
 
   async scheduled(event, env) {
